@@ -2,19 +2,15 @@ import pyoxigraph
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-import openai  # LLM 클라이언트 추가
+import openai  
 import json
 
 class OgenEngine:
-  def __init__(self, ttl_path: str, openai_api_key: str): # API Key 추가
+  def __init__(self, ttl_path: str, openai_api_key: str): 
     
-    self.client = openai.OpenAI(api_key=openai_api_key) # LLM 클라이언트 초기화
+    self.client = openai.OpenAI(api_key=openai_api_key) 
 
     self.store = pyoxigraph.Store()
-
-    if ttl_path is None:
-        base_dir = Path(__file__).parent
-        ttl_path = base_dir / "data" / "knowledge.ttl"
 
     try:
       with open(ttl_path, "rb") as f:
@@ -29,7 +25,6 @@ class OgenEngine:
     self.node_embeddings = []
     self._build_index()
   
-  # ... (기존 _build_index, find_anchor_node 메서드는 동일) ...
   def _build_index(self):
     """Embed all nodes in the graph"""
 
@@ -55,15 +50,12 @@ class OgenEngine:
       if "comment" in binding:
             search_text += f" {binding['comment'].value}"
       
-      # 임베딩은 search_text로 수행
       self.nodes.append({
           "uri": uri, 
           "label": label, 
           "search_text": search_text 
       })
        
-    
-    # print(f"📊 Indexed Nodes: {[n['label'] for n in self.nodes]}") # 로그 너무 길면 주석 처리
 
     if self.nodes:
       labels = [n["label"] for n in self.nodes]
@@ -87,7 +79,6 @@ class OgenEngine:
 
     return best_node["uri"]
   def get_subgraph_context(self, anchor_uri: str):
-    # ... (기존과 동일) ...
     anchor_sparql_ref = f"<{anchor_uri}>" if not anchor_uri.startswith("<") else anchor_uri
 
     query = f"""
@@ -106,7 +97,7 @@ class OgenEngine:
     for binding in results:
       part_uri = binding["part"].value
       parts.append({
-        "type": part_uri.split("/")[-1], # URI의 마지막 부분을 타입으로 사용
+        "type": part_uri.split("/")[-1],
         "label": binding["label"].value,
         "propType": binding["propType"].value if binding["propType"] else "string"
       })
@@ -120,11 +111,9 @@ class OgenEngine:
     if not self.nodes:
       return None
 
-    # 1. Vector Search (Retrieve Top-K)
     query_vec = self.embedder.encode([user_query])
     similarities = cosine_similarity(query_vec, self.node_embeddings)[0]
     
-    # 상위 K개의 인덱스 추출
     top_k_indices = np.argsort(similarities)[::-1][:top_k]
     
     candidates = []
@@ -134,13 +123,11 @@ class OgenEngine:
       candidates.append({
           "uri": node["uri"], 
           "label": node["label"], 
-          "score": float(score) # JSON 직렬화를 위해 float 변환
+          "score": float(score)
       })
 
     print(f"🕵️ Candidates found: {[c['label'] for c in candidates]}")
 
-    # 2. LLM Reasoning (Selector Agent)
-    # 문맥상 가장 적절한 녀석을 LLM이 선택하게 함
     system_prompt = """
     You are a semantic router for a UI Knowledge Graph.
     Select the most appropriate 'Target Component' URI from the candidates based on the user's intent.
@@ -160,7 +147,7 @@ class OgenEngine:
     """
 
     response = self.client.chat.completions.create(
-        model="gpt-4o-mini", # 판단만 하는 거라 가벼운 모델도 OK
+        model="gpt-4o-mini", 
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -183,19 +170,15 @@ class OgenEngine:
     3. Generate Output (LLM Inference)
     """
 
-    # 1. Retrieval + Selection (변경된 메서드 호출)
     anchor_uri = self.find_anchor_node_with_llm(user_query)
     
     if not anchor_uri:
-      # LLM이 "관련된 게 없다"고 판단한 경우
       return {"error": "요청하신 UI 컴포넌트를 지식 그래프에서 찾을 수 없습니다."}
         
     anchor_name = anchor_uri.split("/")[-1]
     
-    # 2. Graph Expansion (선택된 앵커 기준으로 팩트 조회)
     retrieved_children = self.get_subgraph_context(anchor_uri)
     
-    # 상황별 제약조건 설정 (이 부분도 추후엔 LLM이 판단하게 할 수 있음)
     constraints = []
     if context_mode == "low-vision":
       constraints = ["High Contrast Theme", "Base Font Size 24px"]
@@ -207,8 +190,6 @@ class OgenEngine:
     Target: {anchor_name}
     Available Parts: {json.dumps(retrieved_children, ensure_ascii=False)}
     """
-    # 2. Prompt Engineering (Context Injection)
-    # LLM에게 그래프 데이터를 문맥으로 제공합니다.
     system_prompt = f"""
     You are an expert UI Compiler powered by a Knowledge Graph.
     Your job is to generate a JSON specification for a UI component based on the user's request.
@@ -232,14 +213,13 @@ class OgenEngine:
     Generate the UI JSON spec now.
     """
 
-    # 3. Generation (LLM Call)
     response = self.client.chat.completions.create(
-        model="gpt-4o-mini", # 혹은 gpt-3.5-turbo, fine-tuned model
+        model="gpt-4o-mini", 
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        response_format={"type": "json_object"} # JSON 모드 강제
+        response_format={"type": "json_object"} 
     )
 
     llm_output = json.loads(response.choices[0].message.content)
