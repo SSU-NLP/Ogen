@@ -1,0 +1,7 @@
+[project]
+name = "ogen-ui-monorepo"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["apps/server", "packages/ogen_stream"]

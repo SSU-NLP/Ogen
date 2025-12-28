@@ -1,0 +1,11 @@
+{
+  "name": "@ogen/svelte",
+  "version": "0.0.1",
+  "description": "Ogen Svelte UI",
+  "main": "index.ts",
+  "types": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

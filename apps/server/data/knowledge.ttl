@@ -1,0 +1,112 @@
+@prefix ex: <http://ogen.ai/ontology/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+### 1. [Meta] 디자인 시스템 계층 구조 (Atomic Design) ###
+ex:UIElement a rdfs:Class .
+
+ex:Atom a rdfs:Class ; 
+    rdfs:subClassOf ex:UIElement ;
+    rdfs:comment "더 이상 쪼갤 수 없는 최소 단위 (버튼, 인풋, 아이콘)" .
+
+ex:Molecule a rdfs:Class ; 
+    rdfs:subClassOf ex:UIElement ;
+    rdfs:comment "Atom들이 모여 하나의 기능을 하는 그룹 (검색바, 라벨이 있는 인풋)" .
+
+ex:Organism a rdfs:Class ; 
+    rdfs:subClassOf ex:UIElement ;
+    rdfs:comment "서비스의 특정 섹션을 담당하는 독립적인 컨테이너 (로그인 카드, 헤더)" .
+
+ex:Template a rdfs:Class ; 
+    rdfs:subClassOf ex:UIElement ;
+    rdfs:comment "페이지 레벨의 레이아웃 구조" .
+
+### 2. [Organism] 컨테이너 및 복합 컴포넌트 ###
+
+# --- 로그인 카드 (Login Card) ---
+ex:LoginCard a ex:Organism ;
+    rdfs:label "Login Card" ;
+    ex:keywords "로그인, 인증, Sign In, Authentication, Entry" ; # 검색 보정용 키워드
+    rdfs:comment "사용자 인증을 위한 표준 컨테이너. 이메일과 비밀번호 입력을 포함함." ;
+    ex:hasPart ex:LoginFormHeader, ex:EmailField, ex:PasswordField, ex:LoginActions ;
+    ex:propSchema """{
+        "width": {"type": "string", "default": "400px"},
+        "shadow": {"type": "boolean", "default": true},
+        "redirectTo": {"type": "string", "description": "로그인 성공 후 이동할 경로"}
+    }""" .
+
+# --- 칸반 보드 (Kanban Board) ---
+ex:KanbanBoard a ex:Organism ;
+    rdfs:label "Kanban Board" ;
+    ex:keywords "칸반, 프로젝트 관리, 할일, Project Management, Agile, Scrum" ;
+    rdfs:comment "업무 흐름을 시각화하는 보드. 여러 개의 컬럼으로 구성됨." ;
+    ex:hasPart ex:KanbanColumn ;
+    ex:propSchema """{
+        "columns": {"type": "array", "itemType": "KanbanColumn"},
+        "dragAndDrop": {"type": "boolean", "default": true}
+    }""" .
+
+### 3. [Molecule] 기능 단위 그룹 ###
+
+ex:EmailField a ex:Molecule ;
+    rdfs:label "Email Field Group" ;
+    rdfs:comment "라벨과 입력창, 에러 메시지가 결합된 이메일 입력 그룹" ;
+    ex:hasPart ex:Label, ex:EmailInput, ex:ErrorMessage .
+
+ex:PasswordField a ex:Molecule ;
+    rdfs:label "Password Field Group" ;
+    rdfs:comment "비밀번호 입력 그룹. 눈 모양 아이콘(Toggle) 포함 가능" ;
+    ex:hasPart ex:Label, ex:PasswordInput .
+
+ex:LoginActions a ex:Molecule ;
+    rdfs:label "Login Action Group" ;
+    ex:hasPart ex:SubmitButton, ex:ForgotPasswordLink .
+
+ex:KanbanColumn a ex:Molecule ;
+    rdfs:label "Kanban Column" ;
+    ex:hasPart ex:ColumnHeader, ex:TaskCardList .
+
+### 4. [Atom] 최소 단위 컴포넌트 ###
+
+# --- Inputs ---
+ex:EmailInput a ex:Atom ;
+    rdfs:label "Email Input" ;
+    ex:propType "input[type='email']" ;
+    ex:propSchema """{"placeholder": "user@example.com", "required": true}""" .
+
+ex:PasswordInput a ex:Atom ;
+    rdfs:label "Password Input" ;
+    ex:propType "input[type='password']" ;
+    ex:propSchema """{"minLength": 8, "showToggle": true}""" .
+
+# --- Buttons ---
+ex:SubmitButton a ex:Atom ;
+    rdfs:label "Submit Button" ;
+    ex:keywords "전송, 확인, 로그인 버튼, CTA" ;
+    ex:propType "button" ;
+    ex:propSchema """{"variant": ["primary", "secondary"], "loading": "boolean"}""" .
+
+# --- Text/Labels ---
+ex:Label a ex:Atom ;
+    rdfs:label "Field Label" ;
+    ex:propType "label" .
+
+ex:ErrorMessage a ex:Atom ;
+    rdfs:label "Error Message" ;
+    ex:propType "span" ;
+    ex:stylePreset "color: red; font-size: 12px;" .
+
+ex:ForgotPasswordLink a ex:Atom ;
+    rdfs:label "Forgot Password Link" ;
+    ex:propType "a" ;
+    ex:keywords "비밀번호 찾기, Reset Password" .
+
+# --- Kanban Specific ---
+ex:TaskCard a ex:Atom ;
+    rdfs:label "Task Card" ;
+    rdfs:comment "개별 업무 항목을 나타내는 카드 UI" .
+
+ex:ColumnHeader a ex:Atom ;
+    rdfs:label "Column Header" ;
+    rdfs:comment "칸반 컬럼의 제목 (예: To Do, In Progress)" .
