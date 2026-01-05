@@ -61,23 +61,6 @@ class OgenEngine:
       labels = [n["label"] for n in self.nodes]
       self.node_embeddings = self.embedder.encode(labels)
 
-  def find_anchor_node(self, user_query: str):
-    """Find the anchor node for the user query"""
-    if not self.nodes:
-      return None
-
-    query_vec = self.embedder.encode([user_query])
-    similarities = cosine_similarity(query_vec, self.node_embeddings)[0]
-    best_idx = np.argmax(similarities)
-    best_node = self.nodes[best_idx]
-    
-    print(f"📊 Best Node: {best_node}")
-
-    # 임계값 설정 (너무 관련 없는 경우 필터링)
-    if similarities[best_idx] < 0.3:
-        return None
-
-    return best_node["uri"]
   def get_subgraph_context(self, anchor_uri: str):
     anchor_sparql_ref = f"<{anchor_uri}>" if not anchor_uri.startswith("<") else anchor_uri
 
@@ -102,6 +85,7 @@ class OgenEngine:
         "propType": binding["propType"].value if binding["propType"] else "string"
       })
     return parts
+  
   def find_anchor_node_with_llm(self, user_query: str, top_k: int = 5):
     """
     [Agentic Selection Step]
@@ -183,13 +167,6 @@ class OgenEngine:
     if context_mode == "low-vision":
       constraints = ["High Contrast Theme", "Base Font Size 24px"]
 
-    system_prompt = f"""
-    You are an expert UI Compiler powered by a Knowledge Graph.
-    Generate a JSON specification for a UI component based on the request.
-    
-    Target: {anchor_name}
-    Available Parts: {json.dumps(retrieved_children, ensure_ascii=False)}
-    """
     system_prompt = f"""
     You are an expert UI Compiler powered by a Knowledge Graph.
     Your job is to generate a JSON specification for a UI component based on the user's request.
