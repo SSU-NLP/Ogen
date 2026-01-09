@@ -1,6 +1,7 @@
 import Container from './components/Container.svelte';
 import Input from './components/Input.svelte';
 import Button from './components/Button.svelte';
+import type { ComponentMetadata } from '@ogen/svelte';
 
 export const designSystem: Record<string, any> = {
   'LoginCard': Container,
@@ -16,4 +17,99 @@ export const designSystem: Record<string, any> = {
   'SearchIcon': Button,
   
   'default': Container
+};
+
+// 메타데이터 정의 (필수 컴포넌트부터 시작)
+export const designSystemMetadata: Record<string, ComponentMetadata> = {
+  'LoginCard': {
+    type: 'LoginCard',
+    label: 'Login Card',
+    comment: '사용자 인증을 위한 표준 컨테이너. 이메일과 비밀번호 입력을 포함함.',
+    keywords: ['로그인', '인증', 'Sign In', 'Authentication', 'Entry', 'Login'],
+    category: 'Organism',
+    hasPart: ['EmailField', 'PasswordField', 'LoginActions'],
+    propSchema: {
+      width: { type: 'string', default: '400px', description: '카드 너비' },
+      shadow: { type: 'boolean', default: true, description: '그림자 효과' },
+      redirectTo: { type: 'string', description: '로그인 성공 후 이동할 경로' },
+      label: { type: 'string', description: '카드 제목' }
+    },
+    layoutType: 'flex',
+    flexDirection: 'column',
+    spacing: '16px',
+    ariaLabel: 'Login card container',
+    role: 'form'
+  },
+  
+  'EmailInput': {
+    type: 'EmailInput',
+    label: 'Email Input',
+    comment: '이메일 입력 필드. 이메일 형식 검증을 포함함.',
+    keywords: ['이메일', 'Email', 'Input', '입력', 'Email Field'],
+    category: 'Atom',
+    propSchema: {
+      placeholder: { type: 'string', default: 'user@example.com', description: '플레이스홀더 텍스트' },
+      required: { type: 'boolean', default: true, description: '필수 입력 여부' },
+      label: { type: 'string', description: '라벨 텍스트' },
+      type: { type: 'string', default: 'email', description: '입력 타입' }
+    },
+    propType: "input[type='email']",
+    validationRules: {
+      pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+      message: '올바른 이메일 형식이 아닙니다'
+    },
+    required: true,
+    ariaLabel: 'Email input field',
+    role: 'textbox',
+    ariaRequired: true,
+    defaultState: 'enabled'
+  },
+  
+  'PasswordInput': {
+    type: 'PasswordInput',
+    label: 'Password Input',
+    comment: '비밀번호 입력 필드. 최소 길이 검증을 포함함.',
+    keywords: ['비밀번호', 'Password', 'Input', '입력', 'Secret'],
+    category: 'Atom',
+    propSchema: {
+      placeholder: { type: 'string', default: 'Enter password', description: '플레이스홀더 텍스트' },
+      required: { type: 'boolean', default: true, description: '필수 입력 여부' },
+      label: { type: 'string', description: '라벨 텍스트' },
+      type: { type: 'string', default: 'password', description: '입력 타입' },
+      showToggle: { type: 'boolean', default: false, description: '비밀번호 표시/숨김 토글' }
+    },
+    propType: "input[type='password']",
+    validationRules: {
+      minLength: 8,
+      message: '비밀번호는 최소 8자 이상이어야 합니다'
+    },
+    required: true,
+    ariaLabel: 'Password input field',
+    role: 'textbox',
+    ariaRequired: true,
+    defaultState: 'enabled'
+  },
+  
+  'SubmitButton': {
+    type: 'SubmitButton',
+    label: 'Submit Button',
+    comment: '제출 버튼. 폼 제출 또는 액션 실행에 사용됨.',
+    keywords: ['전송', '확인', 'Submit', 'Button', 'CTA', '로그인 버튼'],
+    category: 'Atom',
+    propSchema: {
+      variant: { type: 'string', default: 'primary', enum: ['primary', 'secondary'], description: '버튼 스타일 변형' },
+      loading: { type: 'boolean', default: false, description: '로딩 상태' },
+      disabled: { type: 'boolean', default: false, description: '비활성화 상태' },
+      label: { type: 'string', default: 'Submit', description: '버튼 텍스트' }
+    },
+    propType: 'button',
+    defaultState: 'enabled',
+    loadingState: false,
+    disabledState: false,
+    ariaLabel: 'Submit button',
+    role: 'button',
+    variant: 'primary'
+  }
+  
+  // 나머지 컴포넌트는 점진적으로 추가
 };

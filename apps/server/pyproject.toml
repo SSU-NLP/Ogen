@@ -7,6 +7,10 @@ dependencies = [
     "uvicorn",
     "python-dotenv",
     "ogen-stream", # 이름 참조
+    "langgraph",
+    "langchain-openai",
+    "langchain-core",
+    "sse-starlette",
 ]
 
 [tool.uv.sources]
