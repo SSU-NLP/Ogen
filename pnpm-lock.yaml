@@ -34,7 +34,14 @@ importers:
         specifier: ^7.2.6
         version: 7.3.0
 
-  packages/svelte: {}
+  packages/svelte:
+    devDependencies:
+      svelte:
+        specifier: ^5.45.6
+        version: 5.46.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
 packages:
 

@@ -8,14 +8,14 @@ export const designSystem: Record<string, any> = {
   'TodoList': Container,
   'KanbanBoard': Container,
   'Molecule': Container,
-  
+
   'EmailInput': Input,
   'PasswordInput': Input,
   'SearchInput': Input,
   'TodoInput': Input,
   'SubmitButton': Button,
   'SearchIcon': Button,
-  
+
   'default': Container
 };
 
@@ -40,7 +40,7 @@ export const designSystemMetadata: Record<string, ComponentMetadata> = {
     ariaLabel: 'Login card container',
     role: 'form'
   },
-  
+
   'EmailInput': {
     type: 'EmailInput',
     label: 'Email Input',
@@ -64,7 +64,7 @@ export const designSystemMetadata: Record<string, ComponentMetadata> = {
     ariaRequired: true,
     defaultState: 'enabled'
   },
-  
+
   'PasswordInput': {
     type: 'PasswordInput',
     label: 'Password Input',
@@ -89,7 +89,7 @@ export const designSystemMetadata: Record<string, ComponentMetadata> = {
     ariaRequired: true,
     defaultState: 'enabled'
   },
-  
+
   'SubmitButton': {
     type: 'SubmitButton',
     label: 'Submit Button',
@@ -110,6 +110,4 @@ export const designSystemMetadata: Record<string, ComponentMetadata> = {
     role: 'button',
     variant: 'primary'
   }
-  
-  // 나머지 컴포넌트는 점진적으로 추가
 };

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import UIEngine from './UIRenderer.svelte';
   
     export let node: any; 
     export let components: Record<string, any> = {}; 
@@ -16,7 +15,7 @@
     <svelte:component this={Component} {...safeProps}>
       {#if node.children && node.children.length > 0}
         {#each node.children as child}
-          <UIEngine node={child} {components} />
+          <svelte:self node={child} {components} />
         {/each}
       {/if}
     </svelte:component>

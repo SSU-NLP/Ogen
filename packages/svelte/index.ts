@@ -13,26 +13,26 @@ export interface OgenState {
 
 export type Listener = (state: OgenState) => void;
 
-interface ApiResponse {
+export interface ApiResponse {
     source_anchor: string;
     reasoning_mode: string;
     generated_spec: UITree;
     error?: string;
 }
 
-interface ConnectResponse {
+export interface ConnectResponse {
     status: 'success' | 'already_connected';
     message: string;
     node_count: number;
 }
 
-interface ConnectResult {
+export interface ConnectResult {
     success: boolean;
     message: string;
     nodeCount?: number;
 }
 
-interface OgenRuntimeOptions {
+export interface OgenRuntimeOptions {
     connectEndpoint?: string;
     ttlContent?: string;
     autoConnect?: boolean;
@@ -44,7 +44,7 @@ export class OgenRuntime {
     private listeners: Listener[] = [];
     private state: OgenState = {
         status: 'idle',
-        tree: null, 
+        tree: null,
         error: null,
         connectionStatus: 'disconnected'
     };
@@ -53,7 +53,7 @@ export class OgenRuntime {
     constructor(endpoint: string, options?: OgenRuntimeOptions) {
         this.endpoint = endpoint;
         this.connectEndpoint = options?.connectEndpoint;
-        
+
         // autoConnect 옵션이 있고 ttlContent가 있으면 자동 연결
         if (options?.autoConnect && options?.ttlContent && this.connectEndpoint) {
             this.connect(this.connectEndpoint, options.ttlContent).catch(err => {
@@ -77,7 +77,7 @@ export class OgenRuntime {
 
     async execute(query: string, context: string = "default"): Promise<void> {
         this.setState({ status: 'loading', error: null });
-        
+
         try {
             const res = await fetch(this.endpoint, {
                 method: 'POST',
@@ -96,9 +96,9 @@ export class OgenRuntime {
                 throw new Error(data.error);
             }
 
-            this.setState({ 
-                status: 'success', 
-                tree: data.generated_spec 
+            this.setState({
+                status: 'success',
+                tree: data.generated_spec
             });
         } catch (error) {
             this.setState({ status: 'error', error: error instanceof Error ? error.message : String(error) });
@@ -107,12 +107,12 @@ export class OgenRuntime {
 
     async connect(endpoint: string, ttlContent: string): Promise<ConnectResult> {
         this.setState({ connectionStatus: 'connecting' });
-        
+
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     ttl_content: ttlContent,
                     base_iri: "http://myapp.com/ui/"
                 })
@@ -124,9 +124,9 @@ export class OgenRuntime {
             }
 
             const data: ConnectResponse = await res.json();
-            
+
             this.isConnected = true;
-            this.setState({ 
+            this.setState({
                 connectionStatus: 'connected'
             });
 
@@ -137,10 +137,10 @@ export class OgenRuntime {
             };
         } catch (error) {
             this.isConnected = false;
-            this.setState({ 
+            this.setState({
                 connectionStatus: 'error'
             });
-            
+
             return {
                 success: false,
                 message: error instanceof Error ? error.message : String(error)
@@ -168,14 +168,14 @@ export interface ChatState {
 
 export type ChatListener = (state: ChatState) => void;
 
-interface StreamChunk {
+export interface StreamChunk {
     type: 'text' | 'ui' | 'error' | 'done';
     content?: string;
     uiTree?: UITree;
     error?: string;
 }
 
-interface OgenChatRuntimeOptions {
+export interface OgenChatRuntimeOptions {
     connectEndpoint?: string;
     ttlContent?: string;
     autoConnect?: boolean;
@@ -201,7 +201,10 @@ export class OgentRuntime {
         this.endpoint = endpoint;
         this.connectEndpoint = options?.connectEndpoint;
         this.enableStreaming = options?.enableStreaming ?? false;
-        
+
+        // Store connection data to avoid repeated connections
+        const connectionKey = `ogen_connection_${endpoint}`;
+
         // autoConnect 옵션이 있고 ttlContent가 있으면 자동 연결
         if (options?.autoConnect && options?.ttlContent && this.connectEndpoint) {
             this.connect(this.connectEndpoint, options.ttlContent).catch(err => {
@@ -233,7 +236,7 @@ export class OgentRuntime {
     }
 
     private updateMessage(messageId: string, updates: Partial<ChatMessage>) {
-        const messages = this.state.messages.map(msg => 
+        const messages = this.state.messages.map(msg =>
             msg.id === messageId ? { ...msg, ...updates } : msg
         );
         this.setState({ messages });
@@ -277,9 +280,9 @@ export class OgentRuntime {
                 content: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
                 isStreaming: false
             });
-            this.setState({ 
-                status: 'error', 
-                error: error instanceof Error ? error.message : String(error) 
+            this.setState({
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error)
             });
         } finally {
             this.currentStreamingMessageId = null;
@@ -322,11 +325,18 @@ export class OgentRuntime {
             const url = `${this.endpoint}/chat/stream?message=${encodeURIComponent(message)}&context=${context}`;
             const eventSource = new EventSource(url);
 
+            let isFinished = false;
+
             eventSource.onmessage = (event) => {
                 try {
                     console.log('📥 SSE message received:', event.data);
                     const chunk: StreamChunk = JSON.parse(event.data);
                     console.log('📦 Parsed chunk:', chunk);
+
+                    if (chunk.type === 'done') {
+                        isFinished = true;
+                    }
+
                     this.handleStreamChunk(chunk, assistantMessage.id);
                 } catch (e) {
                     console.error('❌ Failed to parse stream chunk:', e, event.data);
@@ -335,16 +345,39 @@ export class OgentRuntime {
 
             eventSource.onerror = (error) => {
                 eventSource.close();
-                this.updateMessage(assistantMessage.id, {
-                    content: '❌ 연결 오류가 발생했습니다.',
-                    isStreaming: false
-                });
-                this.setState({ status: 'error', error: 'Connection error' });
+
+                // 이미 완료되었거나 의도적으로 종료된 경우 에러 처리 하지 않음
+                if (isFinished) {
+                    this.currentStreamingMessageId = null;
+                    return;
+                }
+
+                // 현재 메시지에 내용이 있는지 확인
+                const currentMsg = this.state.messages.find(m => m.id === assistantMessage.id);
+                const hasContent = currentMsg && currentMsg.content && currentMsg.content.length > 0;
+
+                if (hasContent) {
+                    // 내용이 있으면 성공으로 처리 (연결이 끊겼지만 데이터는 받음)
+                    console.warn('⚠️ Stream connection closed but content received. Treating as success.');
+                    this.updateMessage(assistantMessage.id, {
+                        isStreaming: false
+                    });
+                    this.setState({ status: 'success' });
+                } else {
+                    // 내용이 없으면 진짜 에러
+                    this.updateMessage(assistantMessage.id, {
+                        content: '❌ 연결 오류가 발생했습니다.',
+                        isStreaming: false
+                    });
+                    this.setState({ status: 'error', error: 'Connection error' });
+                }
+
                 this.currentStreamingMessageId = null;
             };
 
             // 완료 시 정리
             eventSource.addEventListener('done', () => {
+                isFinished = true;
                 eventSource.close();
                 this.updateMessage(assistantMessage.id, {
                     isStreaming: false
@@ -357,9 +390,9 @@ export class OgentRuntime {
                 content: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
                 isStreaming: false
             });
-            this.setState({ 
-                status: 'error', 
-                error: error instanceof Error ? error.message : String(error) 
+            this.setState({
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error)
             });
             this.currentStreamingMessageId = null;
         }
@@ -384,7 +417,7 @@ export class OgentRuntime {
         }
 
         // UI가 있으면 UI 트리 추가, 없으면 텍스트만
-        const content = data.generated_spec 
+        const content = data.generated_spec
             ? '✅ UI가 생성되었습니다!'
             : '응답을 생성했습니다.';
 
@@ -400,7 +433,7 @@ export class OgentRuntime {
     private async executeStreaming(query: string, context: string, messageId: string): Promise<void> {
         const res = await fetch(this.endpoint, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'text/event-stream'
             },
@@ -424,7 +457,7 @@ export class OgentRuntime {
 
         while (true) {
             const { done, value } = await reader.read();
-            
+
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
@@ -473,7 +506,7 @@ export class OgentRuntime {
                     });
                 }
                 break;
-            
+
             case 'ui':
                 if (chunk.uiTree) {
                     this.updateMessage(messageId, {
@@ -482,19 +515,19 @@ export class OgentRuntime {
                     });
                 }
                 break;
-            
+
             case 'error':
                 this.updateMessage(messageId, {
                     content: `❌ Error: ${chunk.error || 'Unknown error'}`,
                     isStreaming: false
                 });
-                this.setState({ 
-                    status: 'error', 
-                    error: chunk.error || 'Unknown error' 
+                this.setState({
+                    status: 'error',
+                    error: chunk.error || 'Unknown error'
                 });
                 this.currentStreamingMessageId = null;
                 break;
-            
+
             case 'done':
                 this.updateMessage(messageId, {
                     isStreaming: false
@@ -506,12 +539,12 @@ export class OgentRuntime {
 
     async connect(endpoint: string, ttlContent: string): Promise<ConnectResult> {
         this.setState({ connectionStatus: 'connecting' });
-        
+
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     ttl_content: ttlContent,
                     base_iri: "http://myapp.com/ui/"
                 })
@@ -523,9 +556,9 @@ export class OgentRuntime {
             }
 
             const data: ConnectResponse = await res.json();
-            
+
             this.isConnected = true;
-            this.setState({ 
+            this.setState({
                 connectionStatus: 'connected'
             });
 
@@ -536,10 +569,10 @@ export class OgentRuntime {
             };
         } catch (error) {
             this.isConnected = false;
-            this.setState({ 
+            this.setState({
                 connectionStatus: 'error'
             });
-            
+
             return {
                 success: false,
                 message: error instanceof Error ? error.message : String(error)
@@ -554,8 +587,15 @@ export class OgentRuntime {
     clearMessages(): void {
         this.setState({ messages: [] });
     }
+
+    restoreConnection(): void {
+        this.isConnected = true;
+        this.setState({
+            connectionStatus: 'connected'
+        });
+    }
 }
 
-export { default as UIRenderer } from './UIEngine.svelte';
+export { default as UIRenderer } from './UIRenderer.svelte';
 export { generateTTLFromDesignSystem } from './ttl-generator';
 export type { ComponentMetadata } from './ttl-generator';

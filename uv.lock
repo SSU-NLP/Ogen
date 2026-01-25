@@ -411,6 +411,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain"
+version = "1.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/3f/371267e88c153500a75c0e9daf9645a69955cfe6f85699955241ac0fa6e2/langchain-1.2.4.tar.gz", hash = "sha256:65119ff1c2ac8cc2410739b0fb2773f8fbfbe83357df9bab8a5fceafb9e04aa1", size = 552340, upload-time = "2026-01-14T19:35:26.556Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/71/667887579bb3cf3c2db88224849f7362a8c3f118666e426a51058ee43d9c/langchain-1.2.4-py3-none-any.whl", hash = "sha256:182ac9f3c4559c5a6477e00d60ff8a56212ec4db6f101a4957492818dc3ce3e9", size = 107949, upload-time = "2026-01-14T19:35:24.7Z" },
+]
+
+[[package]]
 name = "langchain-core"
 version = "1.2.6"
 source = { registry = "https://pypi.org/simple" }
@@ -883,6 +897,12 @@ requires-dist = [
 name = "ogen-ui-monorepo"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "langchain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "langchain", specifier = ">=1.2.4" }]
 
 [[package]]
 name = "openai"
