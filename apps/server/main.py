@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
+from typing import Any, cast
 from dotenv import load_dotenv
 import os
 import uvicorn
 import json
-from sse_starlette.sse import EventSourceResponse, ServerSentEvent
+from sse_starlette.sse import EventSourceResponse
+from sse_starlette.event import ServerSentEvent
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from ogen_stream.engine import OgenEngine
@@ -24,16 +26,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # --- 1. 엔진 초기화 (서버 시작 시 1회 로드) ---
 # 온톨로지는 라이브러리 내부에서 자동 로드됨
-API_KEY = os.getenv("OPENAI_API_KEY")
+# Prefer OpenRouter for demo (supports many models) if provided.
+API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+BASE_URL = os.getenv("OPENAI_BASE_URL")
 
 if not API_KEY:
-    raise ValueError("OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.")
+    raise ValueError("OPENROUTER_API_KEY 또는 OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.")
+
+# If user provides OpenRouter key and no explicit base URL, default to OpenRouter.
+if not BASE_URL and os.getenv("OPENROUTER_API_KEY"):
+    BASE_URL = "https://openrouter.ai/api/v1"
 
 try:
     # 엔진 인스턴스 생성 (온톨로지만 로드, 사용자 데이터는 API로 받음)
-    engine = OgenEngine(openai_api_key=API_KEY)
+    engine = OgenEngine(openai_api_key=API_KEY, openai_base_url=BASE_URL)
     print("✅ Ogen Engine initialized successfully (Ontology loaded).")
 
     # UI 생성 파이프라인 생성
@@ -43,9 +52,26 @@ try:
     ui_tool = create_langchain_tool(pipeline)
 
     # Agent 생성 (Tool 포함)
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=API_KEY)
+    # Use an OpenAI-compatible tool-calling model.
+    chat_model = "openai/gpt-4o-mini" if BASE_URL else "gpt-4o-mini"
+    llm = ChatOpenAI(
+        model=chat_model,
+        api_key=SecretStr(API_KEY),
+        base_url=BASE_URL,
+        temperature=0,
+    )
     tools = [ui_tool]
-    agent = create_agent(llm, tools)
+
+    TOOL_CALLING_SYSTEM_PROMPT = (
+        "You are an enterprise UI assistant. Your job is to help users quickly by either: "
+        "(A) answering with plain text when text is sufficient, or "
+        "(B) calling the generate_ui tool when showing a UI would help the user. "
+        "If a UI would help, you MUST call generate_ui. "
+        "Never invent component types not present in the knowledge graph. "
+        "When calling generate_ui, pass user_query exactly and pass context_mode when relevant."
+    )
+
+    agent = create_agent(llm, tools, system_prompt=TOOL_CALLING_SYSTEM_PROMPT)
 
     print("✅ Langgraph Agent initialized successfully.")
 except Exception as e:
@@ -67,7 +93,7 @@ class ChatRequest(BaseModel):
 class ConnectRequest(BaseModel):
     ttl_content: str
     base_iri: str = "http://myapp.com/ui/"
-
+    force: bool = False
 
 # --- 3. API 엔드포인트 ---
 @app.post("/generate-ui")
@@ -140,7 +166,7 @@ async def connect_knowledge_graph(request: ConnectRequest):
     try:
         # 라이브러리 함수 호출 - 모든 로직이 여기에 캡슐화됨
         result = engine.connect_user_data(
-            ttl_string=request.ttl_content, base_iri=request.base_iri
+            ttl_string=request.ttl_content, base_iri=request.base_iri, force=request.force
         )
         return result  # 그대로 반환
     except ValueError as e:
@@ -153,140 +179,110 @@ async def connect_knowledge_graph(request: ConnectRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- 5. Chat 스트리밍 엔드포인트 ---
-@app.get("/chat/stream")
-async def chat_stream(message: str, context: str = "default"):
-    """
-    Server-Sent Events로 스트리밍 응답
-    Agent가 Tool을 호출하면 UI 이벤트 전송, 텍스트 응답은 텍스트 이벤트로 전송
+def _chat_stream_event_generator(message: str, context: str):
+    """Shared SSE generator for chat streaming.
+
+    Design goal:
+    - Tool-calling only: UI JSON must come from the generate_ui tool.
+    - LLM decides: If showing UI is helpful, call the tool.
     """
 
     async def event_generator():
         try:
-            # Agent 실행 및 스트리밍
-            config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
+            print(f"📩 Starting stream for message: {message} (Context: {context})")
 
-            print(f"📩 Starting stream for message: {message}")
+            config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
+            emitted_text = ""
+
+            # create_agent expects OpenAI-style message dicts
+            inputs = {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"[context_mode={context}] {message}",
+                    }
+                ]
+            }
 
             async for event in agent.astream(
-                {"messages": [("user", message)]}, config=config
+                cast(Any, inputs),
+                config=cast(Any, config),
+                stream_mode="updates",
             ):
-                print(f"🔍 Event received: {list(event.keys())}")
+                if not isinstance(event, dict):
+                    continue
 
-                # Agent의 각 단계를 이벤트로 변환
-                for node_name, node_output in event.items():
-                    print(f"  📦 Node: {node_name}, Type: {type(node_output)}")
+                for _node_name, node_output in event.items():
+                    if not isinstance(node_output, dict):
+                        continue
 
-                    if node_name == "agent":
-                        # Langgraph agent는 StateGraph를 반환하므로 node_output은 State
-                        if isinstance(node_output, dict):
-                            messages = node_output.get("messages", [])
-                            print(f"    💬 Messages count: {len(messages)}")
+                    node_messages = node_output.get("messages", [])
+                    for msg in node_messages:
+                        msg_type = getattr(msg, "type", None) or (
+                            msg.get("type") if isinstance(msg, dict) else None
+                        )
 
-                            for msg in messages:
-                                # Langchain 메시지 객체 확인
-                                msg_type = getattr(msg, "type", None) or (
-                                    msg.get("type") if isinstance(msg, dict) else None
-                                )
-                                print(f"      📨 Message type: {msg_type}")
+                        # Text from AI messages
+                        if msg_type == "ai" or (
+                            isinstance(msg, dict) and msg.get("type") == "ai"
+                        ):
+                            content = getattr(msg, "content", None) or (
+                                msg.get("content") if isinstance(msg, dict) else None
+                            )
+                            if not content or not isinstance(content, str):
+                                continue
 
-                                # Tool 호출 메시지 확인
-                                tool_calls = getattr(msg, "tool_calls", None) or (
-                                    msg.get("tool_calls")
-                                    if isinstance(msg, dict)
-                                    else None
-                                )
-                                if tool_calls:
-                                    print(f"      🔧 Tool calls: {len(tool_calls)}")
-                                    for tool_call in tool_calls:
-                                        tool_name = (
-                                            tool_call.get("name")
-                                            if isinstance(tool_call, dict)
-                                            else getattr(tool_call, "name", None)
-                                        )
-                                        print(f"        🛠️ Tool: {tool_name}")
+                            if content.startswith(emitted_text):
+                                delta = content[len(emitted_text) :]
+                            else:
+                                delta = content
 
-                                # AI 응답 메시지
-                                if msg_type == "ai" or (
-                                    isinstance(msg, dict) and msg.get("type") == "ai"
-                                ):
-                                    content = (
-                                        getattr(msg, "content", None)
-                                        or (
-                                            msg.get("content")
-                                            if isinstance(msg, dict)
-                                            else None
-                                        )
-                                        or str(msg)
+                            if delta:
+                                emitted_text = content
+                                yield ServerSentEvent(
+                                    data=json.dumps(
+                                        {
+                                            "type": StreamEventType.TEXT.value,
+                                            "content": delta,
+                                        },
+                                        ensure_ascii=False,
                                     )
-                                    if (
-                                        content
-                                        and isinstance(content, str)
-                                        and content.strip()
-                                    ):
-                                        print(f"      ✍️ AI Content: {content[:50]}...")
-                                        # 텍스트를 단어 단위로 스트리밍
-                                        words = content.split()
-                                        for word in words:
-                                            event_dict = {
-                                                "type": StreamEventType.TEXT.value,
-                                                "content": word + " ",
-                                            }
-                                            yield ServerSentEvent(
-                                                data=json.dumps(
-                                                    event_dict, ensure_ascii=False
-                                                )
-                                            )
-
-                    elif node_name == "tools":
-                        # Tool 실행 결과 처리
-                        print(f"    🛠️ Tools node output")
-                        if isinstance(node_output, dict):
-                            messages = node_output.get("messages", [])
-                            for msg in messages:
-                                msg_content = getattr(msg, "content", None) or (
-                                    msg.get("content")
-                                    if isinstance(msg, dict)
-                                    else None
                                 )
-                                if msg_content:
-                                    print(
-                                        f"      📦 Tool result: {str(msg_content)[:100]}..."
-                                    )
-                                    try:
-                                        # Tool 결과가 JSON 문자열일 수 있음
-                                        tool_result = (
-                                            json.loads(msg_content)
-                                            if isinstance(msg_content, str)
-                                            else msg_content
-                                        )
-                                        if isinstance(tool_result, dict):
-                                            if tool_result.get(
-                                                "success"
-                                            ) and tool_result.get("ui_tree"):
-                                                print(
-                                                    f"      ✅ UI Tree found, sending..."
-                                                )
-                                                event_dict = {
-                                                    "type": StreamEventType.UI.value,
-                                                    "uiTree": tool_result["ui_tree"],
-                                                }
-                                                yield ServerSentEvent(
-                                                    data=json.dumps(
-                                                        event_dict, ensure_ascii=False
-                                                    )
-                                                )
-                                    except (json.JSONDecodeError, AttributeError) as e:
-                                        print(
-                                            f"      ⚠️ Failed to parse tool result: {e}"
-                                        )
-                                        pass
 
-            # 완료 이벤트
+                        # Tool results from ToolMessage
+                        if msg_type == "tool" or (
+                            isinstance(msg, dict) and msg.get("type") == "tool"
+                        ):
+                            msg_content = getattr(msg, "content", None) or (
+                                msg.get("content") if isinstance(msg, dict) else None
+                            )
+                            if not msg_content:
+                                continue
+
+                            try:
+                                tool_result = (
+                                    json.loads(msg_content)
+                                    if isinstance(msg_content, str)
+                                    else msg_content
+                                )
+                            except Exception:
+                                continue
+
+                            if isinstance(tool_result, dict) and tool_result.get("success"):
+                                ui_tree = tool_result.get("ui_tree")
+                                if ui_tree:
+                                    yield ServerSentEvent(
+                                        data=json.dumps(
+                                            {
+                                                "type": StreamEventType.UI.value,
+                                                "uiTree": ui_tree,
+                                            },
+                                            ensure_ascii=False,
+                                        )
+                                    )
+
             yield ServerSentEvent(
-                data=json.dumps(
-                    {"type": StreamEventType.DONE.value}, ensure_ascii=False
-                )
+                data=json.dumps({"type": StreamEventType.DONE.value}, ensure_ascii=False)
             )
 
         except Exception as e:
@@ -301,6 +297,25 @@ async def chat_stream(message: str, context: str = "default"):
                 )
             )
 
+    return event_generator
+
+
+# --- 5. Chat 스트리밍 엔드포인트 ---
+# Browser EventSource requires GET (no request body).
+@app.get("/chat/stream")
+async def chat_stream(message: str, context: str = "default"):
+    """
+    Server-Sent Events로 스트리밍 응답
+    Agent가 Tool을 호출하면 UI 이벤트 전송, 텍스트 응답은 텍스트 이벤트로 전송
+    """
+    event_generator = _chat_stream_event_generator(message, context)
+    return EventSourceResponse(event_generator())
+
+
+# Keep POST endpoint for non-browser clients.
+@app.post("/chat/stream")
+async def chat_stream_post(request: ChatRequest):
+    event_generator = _chat_stream_event_generator(request.message, request.context)
     return EventSourceResponse(event_generator())
 
 

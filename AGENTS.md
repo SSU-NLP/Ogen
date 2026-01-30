@@ -5,7 +5,7 @@ This file contains essential information for agentic coding agents working in th
 ## Project Overview
 
 Ogen-UI is a monorepo containing an AI-driven UI generation system with:
-- **Frontend**: SvelteKit 2 + TypeScript 5 + Vite 7
+- **Frontend**: SvelteKit 2.49.1 + TypeScript 5.9.3 + Vite 7.2.6
 - **Backend**: FastAPI + Python 3.11+ with LangGraph/LangChain
 - **Architecture**: Knowledge graph-driven UI generation using RDF/TTL ontology
 - **Communication**: Server-Sent Events (SSE) for streaming chat interface
@@ -15,15 +15,16 @@ Ogen-UI is a monorepo containing an AI-driven UI generation system with:
 ```
 ogen-ui/
 ├── apps/
-│   ├── front/          # SvelteKit frontend (port 5173)
+│   ├── front/          # SvelteKit frontend demo (port 5173)
 │   └── server/         # FastAPI backend (port 8000)
 ├── packages/
-│   ├── svelte/         # Custom UI library (@ogen/svelte)
+│   ├── svelte/         # @ogen/svelte - UI runtime library
+│   ├── design-studio/  # @ogen/design-studio - Component metadata management
 │   ├── ogen_stream/    # Python streaming library
 │   └── core/           # Shared code (currently empty)
 ├── pnpm-workspace.yaml # Node.js workspace config
-├── pyproject.toml     # Python workspace config
-└── start.sh           # Development startup script
+├── pyproject.toml      # Python workspace config (uv-based)
+└── start.sh            # Development startup script
 ```
 
 ## Build/Test/Lint Commands
@@ -65,19 +66,27 @@ uv sync              # Install dependencies
 #### Component Structure (Svelte 5 syntax)
 ```svelte
 <script lang="ts">
-  // Props with TypeScript types and defaults
+  // 1. Props with TypeScript types and defaults
   export let label: string = "Button";
   export let variant: 'primary' | 'secondary' = 'primary';
   
-  // Imports: libraries first, then local with $lib alias
+  // 2. Imports: libraries first, then local with $lib alias
   import { onMount } from 'svelte';
   import Button from '$lib/components/Button.svelte';
   
-  // Reactive statements
+  // 3. State variables
+  let isLoading: boolean = false;
+  
+  // 4. Reactive statements
   $: isActive = variant === 'primary';
+  
+  // 5. Lifecycle hooks
+  onMount(() => {
+    // initialization
+  });
 </script>
 
-<!-- HTML with Svelte control flow -->
+<!-- HTML with Svelte 5 control flow -->
 {#if Component}
   <Component {label} {variant} />
 {:else}
@@ -135,6 +144,31 @@ export type { ComponentMetadata } from './types';
 
 ### Python Conventions
 
+#### Module Structure
+```python
+"""
+Module docstring explaining purpose.
+"""
+from typing import Dict, Any, AsyncIterator, Optional
+from pydantic import BaseModel, Field
+from .engine import OgenEngine
+from .stream import StreamEvent, StreamEventType
+
+# Constants at module level
+DEFAULT_TIMEOUT = 30
+MAX_RETRIES = 3
+
+class ClassName:
+    """Class docstring with Args and Returns."""
+    
+    def __init__(self, param: str):
+        """
+        Args:
+            param: Parameter description
+        """
+        self.param = param
+```
+
 #### FastAPI Patterns
 ```python
 # Error handling
@@ -143,13 +177,43 @@ try:
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+except ValidationError as e:
+    raise HTTPException(status_code=422, detail=str(e))
 except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
 
 # Type hints for all function parameters and return values
 def process_query(query: str, context_mode: str) -> Dict[str, Any]:
-    """Process user query with context."""
+    """Process user query with context.
+    
+    Args:
+        query: User query string
+        context_mode: Context mode (default, low-vision, etc.)
+    
+    Returns:
+        Dict containing processed result
+    """
     pass
+```
+
+#### Python Type Annotations
+```python
+# Use type hints for all function signatures
+from typing import Dict, List, Optional, Union, Any
+
+def fetch_data(
+    uri: str,
+    options: Optional[Dict[str, Any]] = None
+) -> Union[Dict[str, Any], None]:
+    """Function with explicit type annotations."""
+    pass
+
+# Use Pydantic for request/response models
+from pydantic import BaseModel, Field
+
+class UIRequest(BaseModel):
+    query: str
+    context: str = "default"
 ```
 
 ## Naming Conventions
@@ -251,3 +315,6 @@ uv run pytest test_module.py::test_function  # Run single test
 - Backend uses Python 3.11+ with uv package manager
 - Monorepo structure - shared code goes in `packages/`
 - No existing rules files (.cursor, .cursorrules, .github/copilot-instructions.md)
+- TTL files are loaded from `packages/ogen_stream/src/ogen_stream/ogen-core.ttl`
+- Design Studio is now at `packages/design-studio/` (npm: @ogen/design-studio)
+- Access Design Studio UI at: http://localhost:5173/design-studio

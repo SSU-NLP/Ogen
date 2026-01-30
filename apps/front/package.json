@@ -26,6 +26,7 @@
 		]
 	},
 	"dependencies": {
-		"@ogen/svelte": "workspace:^"
+		"@ogen/svelte": "workspace:^",
+		"@ogen/design-studio": "workspace:^"
 	}
 }

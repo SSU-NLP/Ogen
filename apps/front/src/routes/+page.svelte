@@ -6,7 +6,7 @@
     generateTTLFromDesignSystem,
     type ChatMessage
   } from '@ogen/svelte';
-  import { designSystem, designSystemMetadata } from '$lib/ds';
+  import { designSystem, designSystemMetadata as defaultDesignSystemMetadata } from '$lib/ds';
 
   let query: string = "";
   let runtime: OgentRuntime | null = null;
@@ -19,7 +19,18 @@
     // Check if design system is already connected to backend
     const connectionKey = 'ogen_design_system_hash';
 
-    const currentHash = JSON.stringify(designSystemMetadata);
+    // Allow Design Studio to override metadata via localStorage
+    let activeMetadata = defaultDesignSystemMetadata;
+    try {
+      const storedMetadata = localStorage.getItem('ogen_design_system_metadata');
+      if (storedMetadata) {
+        activeMetadata = JSON.parse(storedMetadata);
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load design studio metadata, falling back to defaults:', error);
+    }
+
+    const currentHash = JSON.stringify(activeMetadata);
     const storedHash = localStorage.getItem(connectionKey);
     
     // 런타임 생성
@@ -75,10 +86,11 @@
         console.log('🔄 Connecting design system to backend...');
         
         // 라이브러리 함수로 TTL 생성 (메타데이터 활용)
-        const userKnowledgeTTL = generateTTLFromDesignSystem(designSystem, designSystemMetadata);
+         const userKnowledgeTTL = generateTTLFromDesignSystem(designSystem, activeMetadata);
         
         // Connect to backend
-        const result = await runtime!.connect('http://localhost:8000/api/connect', userKnowledgeTTL);
+         const forceReconnect = storedHash !== currentHash;
+         const result = await runtime!.connect('http://localhost:8000/api/connect', userKnowledgeTTL, forceReconnect);
         
         if (result.success) {
           // Save connection hash to avoid reconnection
@@ -91,11 +103,12 @@
         console.error('❌ Error checking connection status:', error);
         // Fallback: try to connect anyway
         if (runtime) {
-          const userKnowledgeTTL = generateTTLFromDesignSystem(designSystem, designSystemMetadata);
-          await runtime.connect('http://localhost:8000/api/connect', userKnowledgeTTL);
-        }
-      }
-    };
+           const userKnowledgeTTL = generateTTLFromDesignSystem(designSystem, activeMetadata);
+           const forceReconnect = storedHash !== currentHash;
+           await runtime.connect('http://localhost:8000/api/connect', userKnowledgeTTL, forceReconnect);
+         }
+       }
+     };
     
     // Execute connection logic
     checkConnectionAndConnect();

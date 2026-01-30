@@ -3,6 +3,7 @@ UI 생성 함수 제공 (Langchain Tool과 독립적)
 데모 서버에서 Langchain Tool로 래핑하여 사용
 """
 from typing import Optional
+import json
 from pydantic import BaseModel, Field
 from .ui_generator import UIGenerationPipeline
 
@@ -95,33 +96,49 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
     """
     try:
         from langchain_core.tools import BaseTool
+        from langchain_core.tools.base import ArgsSchema
         
         class GenerateUITool(BaseTool):
             """UI 생성 툴 - Agent가 필요할 때 호출"""
             
             name: str = "generate_ui"
             description: str = """
-            사용자의 요청에 따라 UI 컴포넌트를 생성합니다.
-            로그인 폼, 검색 바, 버튼 등의 UI 컴포넌트를 생성할 수 있습니다.
-            사용자가 UI를 요청하거나 UI가 필요한 상황에서 사용하세요.
-            
-            예시:
+            Generate an enterprise UI JSON specification using ONLY the company's registered components
+            from the knowledge graph.
+
+            Call this tool when:
+            - The user asks to create/build/show a screen or UI (forms, pages, cards, flows)
+            - The user asks "how to do X" and showing the UI would help them understand or act
+            - The user intent can be expressed as UI using existing components
+
+            Do NOT call this tool when:
+            - A plain text answer is sufficient and no UI would help
+
+            Rules:
+            - Never invent component types that do not exist in the knowledge graph.
+            - If you cannot map the request to existing components, ask a clarifying question instead.
+            - Use `context_mode` from the conversation if provided.
+
+            Examples:
             - "로그인 폼 만들어줘"
             - "검색 바를 추가해줘"
-            - "버튼을 만들어줘"
-            - "로그인 어떻게 해?"
+            - "로그인 어떻게 해?" (UI helps, so call the tool)
             """
-            args_schema: type[BaseModel] = GenerateUIToolInput
+            args_schema: ArgsSchema | None = GenerateUIToolInput
             _pipeline: UIGenerationPipeline
             
             def __init__(self, pipeline: UIGenerationPipeline, **kwargs):
                 super().__init__(**kwargs)
                 self._pipeline = pipeline
             
-            def _run(self, user_query: str, context_mode: str = "default") -> dict:
-                return generate_ui(self._pipeline, user_query, context_mode)
+            def _run(self, user_query: str, context_mode: str = "default") -> str:
+                # ToolMessage content should be JSON for reliable parsing in SSE.
+                return json.dumps(
+                    generate_ui(self._pipeline, user_query, context_mode),
+                    ensure_ascii=False,
+                )
             
-            async def _arun(self, user_query: str, context_mode: str = "default") -> dict:
+            async def _arun(self, user_query: str, context_mode: str = "default") -> str:
                 return self._run(user_query, context_mode)
         
         return GenerateUITool(pipeline=pipeline)
@@ -189,4 +206,3 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
                 "error": str(e),
                 "ui_tree": None
             }
-

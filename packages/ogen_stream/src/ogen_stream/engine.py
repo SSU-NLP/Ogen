@@ -1,5 +1,5 @@
 import pyoxigraph
-from pyoxigraph import Store, NamedNode
+from pyoxigraph import Store, NamedNode, RdfFormat
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
@@ -10,22 +10,46 @@ from pathlib import Path
 
 
 class OgenEngine:
-    def __init__(self, openai_api_key: str, persistence_dir: str = "./ogen_data"):
-        self.client = openai.OpenAI(api_key=openai_api_key)
+    def __init__(
+        self,
+        openai_api_key: str,
+        persistence_dir: str = "./ogen_data",
+        openai_base_url: str | None = None,
+    ):
+        self.client = openai.OpenAI(api_key=openai_api_key, base_url=openai_base_url)
         self.persistence_dir = Path(persistence_dir)
         self.persistence_dir.mkdir(exist_ok=True)
 
-        # Try to load existing graph from disk
-        graph_file = self.persistence_dir / "user_graph.ttl"
-        if graph_file.exists():
-            self.store = Store()
-            with open(graph_file, "rb") as f:
-                self.store.load(f, "text/turtle", base_iri="http://myapp.com/ui/")
-            print("✅ Loaded persisted graph from disk")
-            self.user_data_loaded = True
-        else:
-            self.store = Store()
-            self.user_data_loaded = False
+        self._store_lock = None
+
+        # Try to load existing graph from disk (dataset formats)
+        graph_file_trig = self.persistence_dir / "user_graph.trig"
+        graph_file_legacy_ttl = self.persistence_dir / "user_graph.ttl"
+
+        self.store = Store()
+        self.user_data_loaded = False
+
+        # Load persisted user graph (preferred: TriG). Fallback: legacy Turtle if present.
+        if graph_file_trig.exists() and graph_file_trig.stat().st_size > 0:
+            try:
+                with open(graph_file_trig, "rb") as f:
+                    self.store.load(f, RdfFormat.TRIG, base_iri="http://myapp.com/ui/")
+                print("✅ Loaded persisted graph from disk (TriG)")
+                self.user_data_loaded = True
+            except Exception as e:
+                print(f"⚠️ Failed to load persisted TriG graph, ignoring: {e}")
+                self.store = Store()
+                self.user_data_loaded = False
+        elif graph_file_legacy_ttl.exists() and graph_file_legacy_ttl.stat().st_size > 0:
+            try:
+                with open(graph_file_legacy_ttl, "rb") as f:
+                    self.store.load(f, "text/turtle", base_iri="http://myapp.com/ui/")
+                print("✅ Loaded persisted graph from disk (legacy Turtle)")
+                self.user_data_loaded = True
+            except Exception as e:
+                print(f"⚠️ Failed to load legacy Turtle graph, ignoring: {e}")
+                self.store = Store()
+                self.user_data_loaded = False
 
         self.GRAPH_CORE = NamedNode("http://ogen.ai/graph/core")
         self.GRAPH_USER = NamedNode("http://ogen.ai/graph/user")
@@ -48,9 +72,16 @@ class OgenEngine:
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         self.nodes = []
         self.node_embeddings = []
-        self.user_data_loaded = False
 
         self._build_index()
+
+        # Initialize lock lazily (avoid importing asyncio in all contexts)
+        try:
+            import threading
+
+            self._store_lock = threading.Lock()
+        except Exception:
+            self._store_lock = None
 
     def _build_index(self):
         """Embed all nodes in the graph (GRAPH_CORE + GRAPH_USER 통합 검색)"""
@@ -575,7 +606,10 @@ class OgenEngine:
             raise ValueError(f"Failed to load user data: {str(e)}")
 
     def connect_user_data(
-        self, ttl_string: str, base_iri: str = "http://myapp.com/ui/"
+        self,
+        ttl_string: str,
+        base_iri: str = "http://myapp.com/ui/",
+        force: bool = False,
     ) -> dict:
         """
         초기 연동을 위한 통합 API 함수
@@ -587,9 +621,8 @@ class OgenEngine:
                 "message": str
             }
         """
-        # 이미 연결되어 있는지 확인
-        if self.is_user_data_loaded():
-            # 현재 노드 개수 반환
+        # Already connected: be idempotent unless force is requested
+        if self.is_user_data_loaded() and not force:
             node_count = len(self.nodes)
             return {
                 "status": "already_connected",
@@ -597,8 +630,15 @@ class OgenEngine:
                 "message": f"Already connected! ({node_count} nodes available)",
             }
 
-        # 사용자 데이터 로드
-        result = self.load_user_data_from_string(ttl_string, base_iri)
+        # Rebuild store safely for force reconnect to avoid mixing old and new data.
+        if force:
+            if self._store_lock:
+                with self._store_lock:
+                    result = self._rebuild_store_with_user_data(ttl_string, base_iri)
+            else:
+                result = self._rebuild_store_with_user_data(ttl_string, base_iri)
+        else:
+            result = self.load_user_data_from_string(ttl_string, base_iri)
 
         # 그래프를 디스크에 저장 (다음 시작 시 복원용)
         self._persist_graph()
@@ -612,9 +652,59 @@ class OgenEngine:
     def _persist_graph(self):
         """현재 그래프 상태를 디스크에 저장"""
         try:
-            graph_file = self.persistence_dir / "user_graph.ttl"
-            with open(graph_file, "wb") as f:
-                self.store.dump(f, "text/turtle")
-            print(f"✅ Graph persisted to {graph_file}")
+            graph_file = self.persistence_dir / "user_graph.trig"
+            tmp_file = self.persistence_dir / "user_graph.trig.tmp"
+            print(f"📝 Attempting to persist graph to {graph_file}")
+
+            # Check if store has any data
+            if not self.store:
+                print("❌ Store is None, cannot persist")
+                return
+
+            with open(tmp_file, "wb") as f:
+                # Store.dump serializes datasets; TriG is the preferred dataset format.
+                self.store.dump(f, RdfFormat.TRIG)
+                print("✅ TriG format succeeded")
+
+            tmp_file.replace(graph_file)
+
+            # Verify file was written
+            file_size = graph_file.stat().st_size
+            print(f"✅ Graph persisted to {graph_file} ({file_size} bytes)")
         except Exception as e:
             print(f"❌ Failed to persist graph: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    def _rebuild_store_with_user_data(self, ttl_string: str, base_iri: str) -> dict:
+        """Rebuild Store from scratch (ontology + user ttl) and swap atomically."""
+
+        # Build a new store in isolation
+        new_store = Store()
+        current_dir = Path(__file__).parent
+        ontology_path = current_dir / "ogen-core.ttl"
+
+        with open(ontology_path, "rb") as f:
+            new_store.load(f, "text/turtle", base_iri="http://ogen.ai/ontology/")
+
+        ttl_bytes = ttl_string.encode("utf-8")
+        new_store.load(ttl_bytes, "text/turtle", base_iri=base_iri)
+
+        # Swap in new store and rebuild index
+        old_store = self.store
+        old_loaded = self.user_data_loaded
+        try:
+            self.store = new_store
+            self.user_data_loaded = True
+            self._build_index()
+            node_count = len(self.nodes)
+            return {
+                "success": True,
+                "node_count": node_count,
+                "message": f"User data loaded successfully! ({node_count} total nodes)",
+            }
+        except Exception:
+            self.store = old_store
+            self.user_data_loaded = old_loaded
+            raise

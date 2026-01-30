@@ -105,7 +105,7 @@ export class OgenRuntime {
         }
     }
 
-    async connect(endpoint: string, ttlContent: string): Promise<ConnectResult> {
+    async connect(endpoint: string, ttlContent: string, force: boolean = false): Promise<ConnectResult> {
         this.setState({ connectionStatus: 'connecting' });
 
         try {
@@ -114,7 +114,8 @@ export class OgenRuntime {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ttl_content: ttlContent,
-                    base_iri: "http://myapp.com/ui/"
+                    base_iri: "http://myapp.com/ui/",
+                    force
                 })
             });
 
@@ -537,7 +538,7 @@ export class OgentRuntime {
         }
     }
 
-    async connect(endpoint: string, ttlContent: string): Promise<ConnectResult> {
+    async connect(endpoint: string, ttlContent: string, force: boolean = false): Promise<ConnectResult> {
         this.setState({ connectionStatus: 'connecting' });
 
         try {
@@ -546,7 +547,8 @@ export class OgentRuntime {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ttl_content: ttlContent,
-                    base_iri: "http://myapp.com/ui/"
+                    base_iri: "http://myapp.com/ui/",
+                    force
                 })
             });
 

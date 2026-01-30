@@ -1,0 +1,52 @@
+{
+  "name": "@ogen/design-studio",
+  "version": "0.0.1",
+  "description": "Design system management tool for Ogen UI - scan components, edit metadata, generate TTL",
+  "main": "index.ts",
+  "types": "index.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "svelte": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./scanner": {
+      "types": "./scanner/index.ts",
+      "default": "./scanner/index.ts"
+    },
+    "./editor": {
+      "types": "./editor/index.ts",
+      "svelte": "./editor/index.ts",
+      "default": "./editor/index.ts"
+    },
+    "./generator": {
+      "types": "./generator/index.ts",
+      "default": "./generator/index.ts"
+    }
+  },
+  "scripts": {
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "svelte": "^5.45.6",
+    "svelte-check": "^4.3.4",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@ogen/svelte": "workspace:^",
+    "cytoscape": "^3.31.0"
+  },
+  "keywords": [
+    "ogen",
+    "design-system",
+    "svelte",
+    "ontology",
+    "ttl",
+    "rdf"
+  ],
+  "license": "MIT"
+}

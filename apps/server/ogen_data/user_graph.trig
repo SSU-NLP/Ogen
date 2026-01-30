@@ -1,0 +1,227 @@
+<http://myapp.com/ui/SubmitButton> <http://ogen.ai/ontology/variant> "primary" ;
+	<http://ogen.ai/ontology/defaultState> "enabled" ;
+	<http://ogen.ai/ontology/role> "button" ;
+	<http://ogen.ai/ontology/ariaLabel> "Submit button" ;
+	<http://ogen.ai/ontology/propSchema> "{\"variant\":{\"type\":\"string\",\"default\":\"primary\",\"enum\":[\"primary\",\"secondary\"],\"description\":\"버튼 스타일 변형\"},\"loading\":{\"type\":\"boolean\",\"default\":false,\"description\":\"로딩 상태\"},\"disabled\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비활성화 상태\"},\"label\":{\"type\":\"string\",\"default\":\"Submit\",\"description\":\"버튼 텍스트\"}}" ;
+	<http://ogen.ai/ontology/keywords> "전송, 확인, Submit, Button, CTA, 로그인 버튼" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "제출 버튼. 폼 제출 또는 액션 실행에 사용됨." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Submit Button" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/PasswordInput> <http://ogen.ai/ontology/validationRules> "{\"minLength\":8,\"message\":\"비밀번호는 최소 8자 이상이어야 합니다\"}" ;
+	<http://ogen.ai/ontology/defaultState> "enabled" ;
+	<http://ogen.ai/ontology/role> "textbox" ;
+	<http://ogen.ai/ontology/ariaLabel> "Password input field" ;
+	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"Enter password\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"password\",\"description\":\"입력 타입\"},\"showToggle\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비밀번호 표시/숨김 토글\"}}" ;
+	<http://ogen.ai/ontology/keywords> "비밀번호, Password, Input, 입력, Secret" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "비밀번호 입력 필드. 최소 길이 검증을 포함함." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Password Input" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/EmailInput> <http://ogen.ai/ontology/validationRules> "{\"pattern\":\"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\",\"message\":\"올바른 이메일 형식이 아닙니다\"}" ;
+	<http://ogen.ai/ontology/defaultState> "enabled" ;
+	<http://ogen.ai/ontology/role> "textbox" ;
+	<http://ogen.ai/ontology/ariaLabel> "Email input field" ;
+	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"user@example.com\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"email\",\"description\":\"입력 타입\"}}" ;
+	<http://ogen.ai/ontology/keywords> "이메일, Email, Input, 입력, Email Field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "이메일 입력 필드. 이메일 형식 검증을 포함함." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Email Input" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/LoginCard> <http://ogen.ai/ontology/role> "form" ;
+	<http://ogen.ai/ontology/ariaLabel> "Login card container" ;
+	<http://ogen.ai/ontology/spacing> "16px" ;
+	<http://ogen.ai/ontology/flexDirection> "column" ;
+	<http://ogen.ai/ontology/layoutType> "flex" ;
+	<http://ogen.ai/ontology/propSchema> "{\"width\":{\"type\":\"string\",\"default\":\"400px\",\"description\":\"카드 너비\"},\"shadow\":{\"type\":\"boolean\",\"default\":true,\"description\":\"그림자 효과\"},\"redirectTo\":{\"type\":\"string\",\"description\":\"로그인 성공 후 이동할 경로\"},\"label\":{\"type\":\"string\",\"description\":\"카드 제목\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/LoginActions> , <http://myapp.com/ui/PasswordField> , <http://myapp.com/ui/EmailField> ;
+	<http://ogen.ai/ontology/keywords> "로그인, 인증, Sign In, Authentication, Entry, Login" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "사용자 인증을 위한 표준 컨테이너. 이메일과 비밀번호 입력을 포함함." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Login Card" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://ogen.ai/ontology/theme> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "테마 (light, dark 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "theme" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/size> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트 크기 (small, medium, large 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "size" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/variant> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트 변형 (primary, secondary, danger 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "variant" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/dependsOn> <http://www.w3.org/2000/01/rdf-schema#range> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "이 컴포넌트가 의존하는 다른 컴포넌트" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "dependsOn" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/recommends> <http://www.w3.org/2000/01/rdf-schema#range> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "이 컴포넌트와 함께 사용하기를 권장하는 컴포넌트" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "recommends" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/conflictsWith> <http://www.w3.org/2000/01/rdf-schema#range> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "이 컴포넌트와 충돌하는 다른 컴포넌트" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "conflictsWith" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/disabledState> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "비활성화 상태 여부" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "disabledState" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/loadingState> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Action> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "로딩 상태 표시 여부" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "loadingState" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/defaultState> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "기본 상태 (enabled, disabled 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "defaultState" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/state> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트 상태 (loading, disabled, error, success 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "state" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/ariaRequired> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "ARIA required 속성" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "ariaRequired" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/ariaDescribedBy> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "설명을 제공하는 요소의 ID" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "ariaDescribedBy" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/role> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "ARIA role (button, textbox, form 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "role" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/ariaLabel> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "접근성을 위한 라벨 (ARIA label)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "ariaLabel" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/onBlur> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "블러 이벤트 핸들러" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "onBlur" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/onFocus> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "포커스 이벤트 핸들러" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "onFocus" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/onSubmit> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Container> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "제출 이벤트 핸들러 (함수 이름 또는 설명)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "onSubmit" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/onChange> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "변경 이벤트 핸들러 (함수 이름 또는 설명)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "onChange" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/onClick> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Action> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "클릭 이벤트 핸들러 (함수 이름 또는 설명)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "onClick" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/pattern> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "정규식 패턴" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "pattern" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/maxLength> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#integer> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "최대 길이 제한" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "maxLength" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/minLength> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#integer> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "최소 길이 제한" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "minLength" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/required> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "필수 입력 여부" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "required" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/validationRules> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Atom> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "입력 검증 규칙 (JSON 형식)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "validationRules" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/alignment> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Container> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "정렬 방식 (start, center, end, stretch 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "alignment" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/spacing> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Container> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트 간 간격 (CSS 값)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "spacing" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/flexDirection> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Container> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Flexbox 방향 (row, column 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "flexDirection" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/layoutType> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Container> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "레이아웃 타입 (flex, grid, block, inline 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "layoutType" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/Container> <http://www.w3.org/2000/01/rdf-schema#comment> "다른 컴포넌트를 포함할 수 있는 컨테이너" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/requires> <http://www.w3.org/2000/01/rdf-schema#range> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/Action> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "이 컴포넌트가 필요로 하는 다른 컴포넌트" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "requires" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/Action> <http://www.w3.org/2000/01/rdf-schema#comment> "사용자 상호작용을 처리하는 컴포넌트 (버튼, 링크 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/stylePreset> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "기본 스타일 프리셋 (CSS 형식)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "stylePreset" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/keywords> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "검색 보정용 키워드 (다국어 지원)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "keywords" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/propType> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트의 기본 타입 (예: input[type='email'], button 등)" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "propType" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/propSchema> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트의 속성 스키마를 JSON 형식으로 정의" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "propSchema" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/hasPart> <http://www.w3.org/2000/01/rdf-schema#range> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#domain> <http://ogen.ai/ontology/UIElement> ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "컴포넌트가 포함하는 하위 컴포넌트들을 정의" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "hasPart" ;
+	a <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://ogen.ai/ontology/Template> <http://www.w3.org/2000/01/rdf-schema#comment> "페이지 레벨의 레이아웃 구조" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/Organism> <http://www.w3.org/2000/01/rdf-schema#comment> "서비스의 특정 섹션을 담당하는 독립적인 컨테이너 (로그인 카드, 헤더)" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/Molecule> <http://www.w3.org/2000/01/rdf-schema#comment> "Atom들이 모여 하나의 기능을 하는 그룹 (검색바, 라벨이 있는 인풋)" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/Atom> <http://www.w3.org/2000/01/rdf-schema#comment> "더 이상 쪼갤 수 없는 최소 단위 (버튼, 인풋, 아이콘)" ;
+	<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://ogen.ai/ontology/UIElement> ;
+	a <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://ogen.ai/ontology/UIElement> a <http://www.w3.org/2000/01/rdf-schema#Class> .

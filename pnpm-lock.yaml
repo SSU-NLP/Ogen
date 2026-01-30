@@ -8,6 +8,9 @@ importers:
 
   apps/front:
     dependencies:
+      '@ogen/design-studio':
+        specifier: workspace:^
+        version: link:../../packages/design-studio
       '@ogen/svelte':
         specifier: workspace:^
         version: link:../../packages/svelte
@@ -34,14 +37,34 @@ importers:
         specifier: ^7.2.6
         version: 7.3.0
 
-  packages/svelte:
+  packages/design-studio:
+    dependencies:
+      '@ogen/svelte':
+        specifier: workspace:^
+        version: link:../svelte
+      cytoscape:
+        specifier: ^3.31.0
+        version: 3.33.1
     devDependencies:
       svelte:
         specifier: ^5.45.6
         version: 5.46.1
+      svelte-check:
+        specifier: ^4.3.4
+        version: 4.3.5(picomatch@4.0.3)(svelte@5.46.1)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/svelte:
+    dependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+    devDependencies:
+      svelte:
+        specifier: ^5.45.6
+        version: 5.46.1
 
 packages:
 
@@ -401,6 +424,10 @@ packages:
   cookie@0.6.0:
     resolution: {integrity: sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw==}
     engines: {node: '>= 0.6'}
+
+  cytoscape@3.33.1:
+    resolution: {integrity: sha512-iJc4TwyANnOGR1OmWhsS9ayRS3s+XQ185FmuHObThD+5AeJCakAAbWv8KimMTt08xCCLNgneQwFp+JRJOr9qGQ==}
+    engines: {node: '>=0.10'}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -817,6 +844,8 @@ snapshots:
   clsx@2.1.1: {}
 
   cookie@0.6.0: {}
+
+  cytoscape@3.33.1: {}
 
   debug@4.4.3:
     dependencies:
