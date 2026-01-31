@@ -37,9 +37,9 @@ def generate_ui(
         
         if anchor_uri:
             context = pipeline.get_context(anchor_uri)
-            anchor_name = anchor_uri.split("/")[-1]
+            # anchor_name = anchor_uri.split("/")[-1] # REMOVED
             result = pipeline.generate_with_context(
-                user_query, requirement_analysis, anchor_name, context, context_mode
+                user_query, requirement_analysis, anchor_uri, context, context_mode
             )
         else:
             # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
@@ -49,10 +49,10 @@ def generate_ui(
                 for node in pipeline.engine.nodes:
                     if suggested.lower() in node["label"].lower() or node["label"].lower() in suggested.lower():
                         anchor_uri = node["uri"]
-                        anchor_name = anchor_uri.split("/")[-1]
+                        # anchor_name = anchor_uri.split("/")[-1] # REMOVED
                         context = pipeline.get_context(anchor_uri)
                         result = pipeline.generate_with_context(
-                            user_query, requirement_analysis, anchor_name, context, context_mode
+                            user_query, requirement_analysis, anchor_uri, context, context_mode
                         )
                         break
                 else:
@@ -166,9 +166,9 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
             
             if anchor_uri:
                 context = self.pipeline.get_context(anchor_uri)
-                anchor_name = anchor_uri.split("/")[-1]
+                # anchor_name = anchor_uri.split("/")[-1] # REMOVED
                 result = self.pipeline.generate_with_context(
-                    user_query, requirement_analysis, anchor_name, context, context_mode
+                    user_query, requirement_analysis, anchor_uri, context, context_mode
                 )
             else:
                 # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
@@ -178,10 +178,10 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
                     for node in self.pipeline.engine.nodes:
                         if suggested.lower() in node["label"].lower() or node["label"].lower() in suggested.lower():
                             anchor_uri = node["uri"]
-                            anchor_name = anchor_uri.split("/")[-1]
+                            # anchor_name = anchor_uri.split("/")[-1] # REMOVED
                             context = self.pipeline.get_context(anchor_uri)
                             result = self.pipeline.generate_with_context(
-                                user_query, requirement_analysis, anchor_name, context, context_mode
+                                user_query, requirement_analysis, anchor_uri, context, context_mode
                             )
                             break
                     else:

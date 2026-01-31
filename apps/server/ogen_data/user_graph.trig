@@ -1,30 +1,65 @@
+<http://myapp.com/ui/SearchIcon> <http://ogen.ai/ontology/keywords> "SearchIcon, Search Icon" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Search Icon component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Search Icon" ;
+	a <http://ogen.ai/ontology/Container> .
 <http://myapp.com/ui/SubmitButton> <http://ogen.ai/ontology/variant> "primary" ;
+	<http://ogen.ai/ontology/disabledState> false ;
+	<http://ogen.ai/ontology/loadingState> false ;
 	<http://ogen.ai/ontology/defaultState> "enabled" ;
 	<http://ogen.ai/ontology/role> "button" ;
 	<http://ogen.ai/ontology/ariaLabel> "Submit button" ;
+	<http://ogen.ai/ontology/propType> "button" ;
 	<http://ogen.ai/ontology/propSchema> "{\"variant\":{\"type\":\"string\",\"default\":\"primary\",\"enum\":[\"primary\",\"secondary\"],\"description\":\"버튼 스타일 변형\"},\"loading\":{\"type\":\"boolean\",\"default\":false,\"description\":\"로딩 상태\"},\"disabled\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비활성화 상태\"},\"label\":{\"type\":\"string\",\"default\":\"Submit\",\"description\":\"버튼 텍스트\"}}" ;
 	<http://ogen.ai/ontology/keywords> "전송, 확인, Submit, Button, CTA, 로그인 버튼" ;
 	<http://www.w3.org/2000/01/rdf-schema#comment> "제출 버튼. 폼 제출 또는 액션 실행에 사용됨." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Submit Button" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/PasswordInput> <http://ogen.ai/ontology/validationRules> "{\"minLength\":8,\"message\":\"비밀번호는 최소 8자 이상이어야 합니다\"}" ;
-	<http://ogen.ai/ontology/defaultState> "enabled" ;
+<http://myapp.com/ui/TodoInput> <http://ogen.ai/ontology/keywords> "TodoInput, Todo Input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Todo Input component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Todo Input" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/SearchInput> <http://ogen.ai/ontology/keywords> "SearchInput, Search Input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Search Input component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Search Input" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/PasswordInput> <http://ogen.ai/ontology/defaultState> "enabled" ;
+	<http://ogen.ai/ontology/ariaRequired> true ;
 	<http://ogen.ai/ontology/role> "textbox" ;
 	<http://ogen.ai/ontology/ariaLabel> "Password input field" ;
+	<http://ogen.ai/ontology/minLength> 8 ;
+	<http://ogen.ai/ontology/required> true ;
+	<http://ogen.ai/ontology/validationRules> "{\"minLength\":8,\"message\":\"비밀번호는 최소 8자 이상이어야 합니다\"}" ;
+	<http://ogen.ai/ontology/propType> "input[type='password']" ;
 	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"Enter password\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"password\",\"description\":\"입력 타입\"},\"showToggle\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비밀번호 표시/숨김 토글\"}}" ;
 	<http://ogen.ai/ontology/keywords> "비밀번호, Password, Input, 입력, Secret" ;
 	<http://www.w3.org/2000/01/rdf-schema#comment> "비밀번호 입력 필드. 최소 길이 검증을 포함함." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Password Input" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/EmailInput> <http://ogen.ai/ontology/validationRules> "{\"pattern\":\"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\",\"message\":\"올바른 이메일 형식이 아닙니다\"}" ;
-	<http://ogen.ai/ontology/defaultState> "enabled" ;
+<http://myapp.com/ui/EmailInput> <http://ogen.ai/ontology/defaultState> "enabled" ;
+	<http://ogen.ai/ontology/ariaRequired> true ;
 	<http://ogen.ai/ontology/role> "textbox" ;
 	<http://ogen.ai/ontology/ariaLabel> "Email input field" ;
+	<http://ogen.ai/ontology/pattern> "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+	<http://ogen.ai/ontology/required> true ;
+	<http://ogen.ai/ontology/validationRules> "{\"pattern\":\"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\",\"message\":\"올바른 이메일 형식이 아닙니다\"}" ;
+	<http://ogen.ai/ontology/propType> "input[type='email']" ;
 	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"user@example.com\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"email\",\"description\":\"입력 타입\"}}" ;
 	<http://ogen.ai/ontology/keywords> "이메일, Email, Input, 입력, Email Field" ;
 	<http://www.w3.org/2000/01/rdf-schema#comment> "이메일 입력 필드. 이메일 형식 검증을 포함함." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Email Input" ;
 	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Molecule> <http://ogen.ai/ontology/keywords> "Molecule, Molecule" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Molecule component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Molecule" ;
+	a <http://ogen.ai/ontology/Container> .
+<http://myapp.com/ui/KanbanBoard> <http://ogen.ai/ontology/keywords> "KanbanBoard, Kanban Board" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Kanban Board component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Kanban Board" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/TodoList> <http://ogen.ai/ontology/keywords> "TodoList, Todo List" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Todo List component" ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Todo List" ;
+	a <http://ogen.ai/ontology/Container> .
 <http://myapp.com/ui/LoginCard> <http://ogen.ai/ontology/role> "form" ;
 	<http://ogen.ai/ontology/ariaLabel> "Login card container" ;
 	<http://ogen.ai/ontology/spacing> "16px" ;

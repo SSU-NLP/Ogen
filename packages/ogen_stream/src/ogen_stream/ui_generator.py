@@ -162,10 +162,10 @@ class UIGenerationPipeline:
                 return
         
         # Step 3: Graph Context 검색
-        anchor_name = anchor_uri.split("/")[-1]
+        # anchor_name = anchor_uri.split("/")[-1]  # REMOVED
         yield StreamEvent(
             type=StreamEventType.TEXT,
-            content=f"{anchor_name} 컴포넌트 정보를 가져오고 있습니다..."
+            content=f"{anchor_uri} 컴포넌트 정보를 가져오고 있습니다..."
         )
         context = self.get_context(anchor_uri)
         
@@ -175,7 +175,7 @@ class UIGenerationPipeline:
             content="UI를 생성하고 있습니다..."
         )
         result = self.generate_with_context(
-            user_query, requirement_analysis, anchor_name, context, context_mode
+            user_query, requirement_analysis, anchor_uri, context, context_mode
         )
         
         yield StreamEvent(
@@ -247,9 +247,9 @@ def generate_ui_spec(
     
     if anchor_uri:
         context = pipeline.get_context(anchor_uri)
-        anchor_name = anchor_uri.split("/")[-1]
+        # anchor_name = anchor_uri.split("/")[-1] # REMOVED
         return pipeline.generate_with_context(
-            user_query, requirement_analysis, anchor_name, context, context_mode
+            user_query, requirement_analysis, anchor_uri, context, context_mode
         )
     else:
         return pipeline.generate_from_analysis(user_query, requirement_analysis, context_mode)

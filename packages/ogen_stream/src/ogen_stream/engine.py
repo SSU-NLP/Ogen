@@ -118,85 +118,82 @@ class OgenEngine:
             self.node_embeddings = self.embedder.encode(labels)
             print(f"📊 Index rebuilt: {len(self.nodes)} nodes")
 
-    def get_subgraph_context(self, anchor_uri: str):
-        anchor_sparql_ref = (
-            f"<{anchor_uri}>" if not anchor_uri.startswith("<") else anchor_uri
-        )
+    def get_subgraph_context(self, anchor_uri: str, max_depth: int = 2):
+        """
+        [Graph Traversal Step]
+        BFS/DFS를 사용하여 Subgraph Context를 동적으로 탐색.
+        Hardcoded된 속성(Layout_intents)을 제거하고, 지식 그래프의 모든 속성을 가져옵니다.
+        """
+        visited = set()
+        queue = [(anchor_uri, 0)]  # (uri, depth)
+        subgraph = {}
 
+        while queue:
+            current_uri, depth = queue.pop(0)  # BFS
+            
+            if current_uri in visited:
+                continue
+            visited.add(current_uri)
+
+            # Node 기본 정보 조회
+            node_info = self._get_node_properties(current_uri)
+            subgraph[current_uri] = node_info
+
+            # 가지치기 (Pruning) & Depth Limit
+            if depth >= max_depth:
+                continue
+
+            # 자식 노드 탐색 (ex: hasPart 관계)
+            children = self._get_children(current_uri)
+            for child_uri in children:
+                if child_uri not in visited:
+                    queue.append((child_uri, depth + 1))
+        
+        # 결과 포맷팅 (List로 변환)
+        return list(subgraph.values())
+
+    def _get_node_properties(self, uri: str) -> dict:
+        """단일 노드의 모든 속성을 동적으로 조회 (Hardcoding 제거)"""
+        sparql_ref = f"<{uri}>" if not uri.startswith("<") else uri
+        
         query = f"""
-    PREFIX ex: <http://ogen.ai/ontology/>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-    SELECT ?part ?label ?propType ?propSchema ?validationRules ?layoutType ?flexDirection ?spacing ?ariaLabel ?role ?defaultState ?variant WHERE {{
-      {anchor_sparql_ref} ex:hasPart ?part .
-      ?part rdfs:label ?label .
-      OPTIONAL {{ ?part ex:propType ?propType }}
-      OPTIONAL {{ ?part ex:propSchema ?propSchema }}
-      OPTIONAL {{ ?part ex:validationRules ?validationRules }}
-      OPTIONAL {{ ?part ex:layoutType ?layoutType }}
-      OPTIONAL {{ ?part ex:flexDirection ?flexDirection }}
-      OPTIONAL {{ ?part ex:spacing ?spacing }}
-      OPTIONAL {{ ?part ex:ariaLabel ?ariaLabel }}
-      OPTIONAL {{ ?part ex:role ?role }}
-      OPTIONAL {{ ?part ex:defaultState ?defaultState }}
-      OPTIONAL {{ ?part ex:variant ?variant }}
-    }}
-    """
-
+        SELECT ?p ?o WHERE {{
+            {sparql_ref} ?p ?o .
+        }}
+        """
         results = self.store.query(query)
-        parts = []
+        properties = {"uri": uri}
+        
         for binding in results:
-            part_uri = binding["part"].value
-            part_info = {
-                "type": part_uri.split("/")[-1],
-                "label": binding["label"].value,
-                "propType": binding["propType"].value
-                if "propType" in binding
-                else None,
-            }
+            p_val = binding["p"].value
+            o_val = binding["o"].value
+            
+            # 속성 이름 추출 (URI의 마지막 부분)
+            prop_name = p_val.split("/")[-1].split("#")[-1]
+            
+            # JSON 파싱 시도 (Schema나 Rules 같은 복잡한 데이터)
+            try:
+                import json
+                parsed_value = json.loads(o_val)
+            except:
+                parsed_value = o_val
+            
+            properties[prop_name] = parsed_value
+            
+        return properties
 
-            # 추가 속성들 포함
-            if "propSchema" in binding:
-                try:
-                    import json
-
-                    part_info["propSchema"] = json.loads(binding["propSchema"].value)
-                except:
-                    part_info["propSchema"] = binding["propSchema"].value
-
-            if "validationRules" in binding:
-                try:
-                    import json
-
-                    part_info["validationRules"] = json.loads(
-                        binding["validationRules"].value
-                    )
-                except:
-                    part_info["validationRules"] = binding["validationRules"].value
-
-            if "layoutType" in binding:
-                part_info["layoutType"] = binding["layoutType"].value
-
-            if "flexDirection" in binding:
-                part_info["flexDirection"] = binding["flexDirection"].value
-
-            if "spacing" in binding:
-                part_info["spacing"] = binding["spacing"].value
-
-            if "ariaLabel" in binding:
-                part_info["ariaLabel"] = binding["ariaLabel"].value
-
-            if "role" in binding:
-                part_info["role"] = binding["role"].value
-
-            if "defaultState" in binding:
-                part_info["defaultState"] = binding["defaultState"].value
-
-            if "variant" in binding:
-                part_info["variant"] = binding["variant"].value
-
-            parts.append(part_info)
-        return parts
+    def _get_children(self, parent_uri: str) -> list:
+        """자식 노드(hasPart 등) URI 조회"""
+        sparql_ref = f"<{parent_uri}>" if not parent_uri.startswith("<") else parent_uri
+        
+        query = f"""
+        PREFIX ex: <http://ogen.ai/ontology/>
+        SELECT ?child WHERE {{
+            {sparql_ref} ex:hasPart ?child .
+        }}
+        """
+        results = self.store.query(query)
+        return [binding["child"].value for binding in results]
 
     def analyze_requirement(self, user_query: str) -> dict:
         """
@@ -387,16 +384,16 @@ class OgenEngine:
                     "error": "요청하신 UI 컴포넌트를 지식 그래프에서 찾을 수 없습니다."
                 }
 
-        # Step 3: Graph Context 검색
-        anchor_name = anchor_uri.split("/")[-1]
-        print(f"📚 Step 3: Retrieving graph context for anchor: {anchor_name}")
+        # Step 3: Graph Context 검색 (Dynamic Traversal)
+        # Note: Removing the split logic as requested. Metadata is typically enough, or we use full URI.
+        print(f"📚 Step 3: Retrieving graph context for anchor: {anchor_uri}")
         retrieved_children = self.get_subgraph_context(anchor_uri)
 
         # Step 4 & 5: UI 생성
         return self._generate_ui_with_context(
             user_query,
             requirement_analysis,
-            anchor_name,
+            anchor_uri,  # Pass full URI instead of split name
             retrieved_children,
             context_mode,
         )
