@@ -33,6 +33,7 @@ export {
 // Generator
 export {
   generateTTL,
+  generateTTLForRegistry,
   generateComponentTTL,
   serializeToTTL
 } from './generator';

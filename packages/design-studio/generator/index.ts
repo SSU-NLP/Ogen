@@ -5,6 +5,7 @@
  */
 
 import type { ComponentMetadata, TTLGenerationOptions } from '../types';
+import { createDefaultMetadata } from '../types/utils';
 
 /**
  * Generate TTL from metadata map
@@ -50,6 +51,51 @@ export function generateTTL(
     lines.push('');
   }
   
+  return lines.join(nl);
+}
+
+/**
+ * Generate TTL for a component registry.
+ *
+ * - Includes ONLY components present in registryKeys.
+ * - If metadata is missing for a component, uses minimal defaults.
+ * - Excludes metadata-only nodes ("red") by design.
+ */
+export function generateTTLForRegistry(
+  registryKeys: string[],
+  metadata: Record<string, ComponentMetadata>,
+  options: TTLGenerationOptions = {}
+): string {
+  const {
+    baseIRI = 'http://myapp.com/ui/',
+    ontologyPrefix = 'http://ogen.ai/ontology/',
+    includeComments = true,
+    prettyPrint = true
+  } = options;
+
+  const lines: string[] = [];
+  const nl = prettyPrint ? '\n' : ' ';
+
+  lines.push(`@prefix user: <${baseIRI}> .`);
+  lines.push(`@prefix ogen: <${ontologyPrefix}> .`);
+  lines.push(`@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .`);
+  lines.push(`@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .`);
+  lines.push(`@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`);
+  lines.push('');
+
+  for (const name of registryKeys) {
+    if (name === 'default') continue;
+    const meta = metadata[name] ?? createDefaultMetadata(name);
+    if (!meta.propSchema) {
+      meta.propSchema = {};
+    }
+    if (includeComments) {
+      lines.push(`# ${meta.label ?? name}`);
+    }
+    lines.push(generateComponentTTL(name, meta, baseIRI, ontologyPrefix));
+    lines.push('');
+  }
+
   return lines.join(nl);
 }
 

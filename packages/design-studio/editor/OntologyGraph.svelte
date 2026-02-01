@@ -3,25 +3,69 @@
   import type cytoscape from 'cytoscape';
   import type { ComponentMetadata } from '../types';
 
-  export let metadata: Record<string, ComponentMetadata> = {};
-  export let selected: string | null = null;
+export let metadata: Record<string, ComponentMetadata> = {};
+export let registryKeys: string[] = [];
+export let theme: 'light' | 'dark' = 'dark';
+export let selected: string | null = null;
 
   const dispatch = createEventDispatcher<{ select: string }>();
 
   let containerEl: HTMLDivElement | null = null;
   let cy: cytoscape.Core | null = null;
+  let lastGraphSignature: string = '';
+
+  function computeGraphSignature(meta: Record<string, ComponentMetadata>): string {
+    const registry = [...registryKeys].sort();
+    const keys = Object.keys(meta).sort();
+    const rel = keys.map((k) => {
+      const m = meta[k];
+      return [
+        k,
+        m?.label ?? '',
+        [...(m?.hasPart ?? [])].sort(),
+        [...(m?.requires ?? [])].sort(),
+        [...(m?.recommends ?? [])].sort(),
+        [...(m?.conflictsWith ?? [])].sort(),
+        [...(m?.dependsOn ?? [])].sort()
+      ];
+    });
+    return JSON.stringify({ registry, rel });
+  }
 
   function buildElements(meta: Record<string, ComponentMetadata>) {
     const elements: cytoscape.ElementDefinition[] = [];
 
-    const nodeIds = new Set<string>(Object.keys(meta));
+    const registryIdSet = new Set<string>(registryKeys);
+    const nodeIds = new Set<string>([...Object.keys(meta), ...registryKeys]);
+
+    // Also include missing targets referenced by relations so edges remain visible
+    const missingTargets = new Set<string>();
 
     for (const [name, m] of Object.entries(meta)) {
+      // Collect missing targets
+      for (const relList of [m.hasPart, m.requires, m.recommends, m.conflictsWith, m.dependsOn]) {
+        for (const t of relList ?? []) {
+          if (t && !nodeIds.has(t)) missingTargets.add(t);
+        }
+      }
+    }
+
+    for (const t of missingTargets) {
+      nodeIds.add(t);
+    }
+
+    // Nodes: union(registryKeys, metadata keys, missing targets)
+    for (const id of nodeIds) {
+      const hasMeta = Object.prototype.hasOwnProperty.call(meta, id);
+      const isInRegistry = registryIdSet.has(id);
+      const status = hasMeta && isInRegistry ? 'green' : isInRegistry ? 'gray' : 'red';
+      const label = hasMeta ? (meta[id]?.label ?? id) : id;
+
       elements.push({
         data: {
-          id: name,
-          label: m.label ?? name,
-          category: m.category ?? 'Unknown'
+          id,
+          label,
+          status
         }
       });
     }
@@ -60,11 +104,33 @@
     }
   }
 
+  function applyThemeStyles(): void {
+    if (!cy) return;
+    const nodeText = theme === 'dark' ? '#cdd6f4' : '#111827';
+    const edgeText = theme === 'dark' ? '#a6adc8' : '#374151';
+    const edgeLine = theme === 'dark' ? '#6c7086' : '#9ca3af';
+
+    cy.style()
+      .selector('node')
+      .style('color', nodeText)
+      .update();
+    cy.style()
+      .selector('edge')
+      .style('line-color', edgeLine)
+      .style('target-arrow-color', edgeLine)
+      .style('color', edgeText)
+      .update();
+  }
+
   onMount(async () => {
     if (!containerEl) return;
     // Lazy import to avoid SSR/runtime issues
     const cytoscapeModule = await import('cytoscape');
     const cytoscapeImpl = cytoscapeModule.default;
+
+    const nodeText = theme === 'dark' ? '#cdd6f4' : '#111827';
+    const edgeText = theme === 'dark' ? '#a6adc8' : '#374151';
+    const edgeLine = theme === 'dark' ? '#6c7086' : '#9ca3af';
 
     cy = cytoscapeImpl({
       container: containerEl,
@@ -74,23 +140,41 @@
         {
           selector: 'node',
           style: {
-            'background-color': '#4c4f69',
             label: 'data(label)',
-            color: '#cdd6f4',
+            color: nodeText,
             'font-size': '10px',
             'text-wrap': 'wrap',
             'text-max-width': '90px',
             'text-valign': 'center',
             'text-halign': 'center',
             width: '34px',
-            height: '34px'
+            height: '34px',
+            'border-width': 2,
+            'border-color': 'rgba(255,255,255,0.10)'
+          }
+        },
+        {
+          selector: 'node[status = "green"]',
+          style: {
+            'background-color': '#10a37f'
+          }
+        },
+        {
+          selector: 'node[status = "gray"]',
+          style: {
+            'background-color': '#6c7086'
+          }
+        },
+        {
+          selector: 'node[status = "red"]',
+          style: {
+            'background-color': '#b91c1c'
           }
         },
         {
           selector: 'node.selected',
           style: {
-            'background-color': '#10a37f',
-            'border-width': 3,
+            'border-width': 4,
             'border-color': '#b7f4df'
           }
         },
@@ -98,13 +182,13 @@
           selector: 'edge',
           style: {
             width: 2,
-            'line-color': '#6c7086',
-            'target-arrow-color': '#6c7086',
+            'line-color': edgeLine,
+            'target-arrow-color': edgeLine,
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             label: 'data(rel)',
             'font-size': '8px',
-            color: '#a6adc8',
+            color: edgeText,
             'text-rotation': 'autorotate'
           }
         }
@@ -116,13 +200,32 @@
       dispatch('select', id);
     });
 
+    lastGraphSignature = computeGraphSignature(metadata);
     applySelection(selected);
+    applyThemeStyles();
   });
 
+  // Only rebuild elements/layout when the underlying graph changes.
+  // Clicking a node updates `selected` and should NOT re-layout (prevents zoom/viewport jumps).
   $: if (cy) {
-    cy.json({ elements: buildElements(metadata) });
-    cy.layout({ name: 'breadthfirst', directed: true, padding: 20 }).run();
+    const sig = computeGraphSignature(metadata);
+    if (sig !== lastGraphSignature) {
+      const zoom = cy.zoom();
+      const pan = cy.pan();
+      cy.json({ elements: buildElements(metadata) });
+      cy.layout({ name: 'breadthfirst', directed: true, padding: 20 }).run();
+      cy.zoom(zoom);
+      cy.pan(pan);
+      lastGraphSignature = sig;
+    }
+  }
+
+  $: if (cy) {
     applySelection(selected);
+  }
+
+  $: if (cy) {
+    applyThemeStyles();
   }
 
   onDestroy(() => {
@@ -151,8 +254,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: #181825;
+    border-bottom: 1px solid var(--ds-border-soft);
+    background: var(--ds-panel-2);
   }
 
   h2 {
@@ -160,13 +263,13 @@
     font-size: 14px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #a6adc8;
+    color: var(--ds-muted);
   }
 
   button {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #cdd6f4;
+    background: var(--ds-surface-2);
+    border: 1px solid var(--ds-border);
+    color: var(--ds-text);
     padding: 6px 10px;
     border-radius: 8px;
     font-size: 13px;
@@ -177,6 +280,6 @@
     min-height: 320px;
     background: radial-gradient(1200px 600px at 20% 10%, rgba(203, 166, 247, 0.10), transparent 50%),
       radial-gradient(900px 500px at 80% 30%, rgba(16, 163, 127, 0.10), transparent 55%),
-      #0f111a;
+      var(--ds-bg);
   }
 </style>
