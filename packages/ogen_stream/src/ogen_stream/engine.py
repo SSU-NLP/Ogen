@@ -40,7 +40,9 @@ class OgenEngine:
                 print(f"⚠️ Failed to load persisted TriG graph, ignoring: {e}")
                 self.store = Store()
                 self.user_data_loaded = False
-        elif graph_file_legacy_ttl.exists() and graph_file_legacy_ttl.stat().st_size > 0:
+        elif (
+            graph_file_legacy_ttl.exists() and graph_file_legacy_ttl.stat().st_size > 0
+        ):
             try:
                 with open(graph_file_legacy_ttl, "rb") as f:
                     self.store.load(f, "text/turtle", base_iri="http://myapp.com/ui/")
@@ -130,7 +132,7 @@ class OgenEngine:
 
         while queue:
             current_uri, depth = queue.pop(0)  # BFS
-            
+
             if current_uri in visited:
                 continue
             visited.add(current_uri)
@@ -148,44 +150,49 @@ class OgenEngine:
             for child_uri in children:
                 if child_uri not in visited:
                     queue.append((child_uri, depth + 1))
-        
+
         # 결과 포맷팅 (List로 변환)
         return list(subgraph.values())
 
     def _get_node_properties(self, uri: str) -> dict:
         """단일 노드의 모든 속성을 동적으로 조회 (Hardcoding 제거)"""
         sparql_ref = f"<{uri}>" if not uri.startswith("<") else uri
-        
+
         query = f"""
         SELECT ?p ?o WHERE {{
             {sparql_ref} ?p ?o .
         }}
         """
         results = self.store.query(query)
-        properties = {"uri": uri}
-        
+        # Provide a stable component id for UI compilation.
+        # This should match the frontend registry key (e.g., "LoginCard").
+        raw_uri = uri[1:-1] if uri.startswith("<") and uri.endswith(">") else uri
+        component_id = raw_uri.split("#")[-1].split("/")[-1]
+        properties = {"uri": uri, "id": component_id}
+
         for binding in results:
             p_val = binding["p"].value
             o_val = binding["o"].value
-            
+
             # 속성 이름 추출 (URI의 마지막 부분)
             prop_name = p_val.split("/")[-1].split("#")[-1]
-            
+
             # JSON 파싱 시도 (Schema나 Rules 같은 복잡한 데이터)
             try:
                 import json
+
                 parsed_value = json.loads(o_val)
             except:
                 parsed_value = o_val
-            
+
             properties[prop_name] = parsed_value
-            
+
         return properties
 
     def _get_children(self, parent_uri: str) -> list:
         """자식 노드(hasPart 등) URI 조회"""
         sparql_ref = f"<{parent_uri}>" if not parent_uri.startswith("<") else parent_uri
-        
+
         query = f"""
         PREFIX ex: <http://ogen.ai/ontology/>
         SELECT ?child WHERE {{
@@ -408,10 +415,17 @@ class OgenEngine:
         if context_mode == "low-vision":
             constraints = ["High Contrast Theme", "Base Font Size 24px"]
 
+        allowed_component_ids = []
+        for node in self.nodes:
+            uri = node.get("uri")
+            if isinstance(uri, str) and uri.startswith("http://myapp.com/ui/"):
+                allowed_component_ids.append(uri.split("/")[-1])
+
         system_prompt = f"""
     You are an expert UI Compiler. Your job is to generate a JSON specification for a UI component based on the user's request and requirement analysis.
     
     [RULES]
+    0. The JSON field "type" MUST be a component id, not a label. Use ONLY ids from AllowedComponentIds.
     1. Generate appropriate UI components based on the requirement analysis.
     2. Apply the 'Constraints' to the properties of the components.
     3. Use standard HTML form elements and components (input, button, form, etc.).
@@ -434,6 +448,9 @@ class OgenEngine:
     User Intent: {requirement_analysis.get("user_intent", "N/A")}
     Required Components: {json.dumps(requirement_analysis.get("required_components", []), ensure_ascii=False, indent=2)}
     Required Features: {json.dumps(requirement_analysis.get("required_features", []), ensure_ascii=False)}
+
+    [AllowedComponentIds]
+    {json.dumps(allowed_component_ids, ensure_ascii=False)}
     
     [Constraints]
     - {", ".join(constraints) if constraints else "None"}
@@ -474,12 +491,22 @@ class OgenEngine:
         if context_mode == "low-vision":
             constraints = ["High Contrast Theme", "Base Font Size 24px"]
 
+        allowed_component_ids = [
+            (c.get("id") or c.get("type") or c.get("label"))
+            for c in retrieved_children
+            if isinstance(c, dict)
+        ]
+
+        # Anchor may be a URI; normalize to an id-like token.
+        anchor_id = str(anchor_name).split("#")[-1].split("/")[-1]
+
         system_prompt = f"""
     You are an expert UI Compiler powered by a Knowledge Graph.
     Your job is to generate a JSON specification for a UI component based on the user's request.
     
     [RULES]
-    1. STRICTLY use only the child components provided in the 'Graph Context'. Do not hallucinate new components.
+    0. The JSON field "type" MUST be a component id, not a label. Use ONLY ids from AllowedComponentIds.
+    1. STRICTLY use only the components provided in the 'Graph Context'. Do not hallucinate new components.
     2. Apply the 'Constraints' to the properties of the components.
     3. Use the propSchema information to set appropriate default values and types.
     4. Apply validationRules when generating input components.
@@ -507,7 +534,9 @@ class OgenEngine:
     User Query: "{user_query}"
     {analysis_summary}
     [Graph Context (Facts)]
-    - Target Component: {anchor_name}
+    - Target Component URI: {anchor_name}
+    - Target Component Id: {anchor_id}
+    - AllowedComponentIds: {json.dumps(allowed_component_ids, ensure_ascii=False)}
     - Available Parts (Sub-components with full metadata): {json.dumps(retrieved_children, ensure_ascii=False, indent=2)}
     
     [Component Information]

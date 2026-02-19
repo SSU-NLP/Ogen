@@ -1,74 +1,333 @@
-<http://myapp.com/ui/SearchIcon> <http://ogen.ai/ontology/keywords> "SearchIcon, Search Icon" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Search Icon component" ;
+<http://myapp.com/ui/TopNav> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"Top Nav\",\"description\":\"Navigation title\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Avatar> , <http://myapp.com/ui/IconButton> , <http://myapp.com/ui/SearchBar> , <http://myapp.com/ui/Link> ;
+	<http://ogen.ai/ontology/keywords> "navigation, topbar, menu" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Top navigation bar." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Top Nav" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/Tooltip> <http://ogen.ai/ontology/propSchema> "{\"text\":{\"type\":\"string\",\"default\":\"Tooltip\",\"description\":\"Tooltip text\"}}" ;
+	<http://ogen.ai/ontology/keywords> "tooltip, hint, help" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Hover tooltip text." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Tooltip" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Toolbar> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"Toolbar\",\"description\":\"Toolbar title\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Tooltip> , <http://myapp.com/ui/IconButton> , <http://myapp.com/ui/Button> , <http://myapp.com/ui/SearchBar> ;
+	<http://ogen.ai/ontology/keywords> "toolbar, actions, header" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Horizontal toolbar area." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Toolbar" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/ToggleSwitch> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Label text\"},\"checked\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Checked state\"}}" ;
+	<http://ogen.ai/ontology/keywords> "toggle, switch, input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Toggle switch control." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Toggle Switch" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/ToggleField> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"checked\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Checked state\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/ToggleSwitch> , <http://myapp.com/ui/Label> ;
+	<http://ogen.ai/ontology/keywords> "toggle, switch, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Labeled toggle field." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Toggle Field" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Textarea> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"placeholder\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Placeholder\"},\"rows\":{\"type\":\"number\",\"default\":4,\"description\":\"Row count\"},\"value\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Value\"}}" ;
+	<http://ogen.ai/ontology/keywords> "textarea, input, multiline" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Multi-line text input." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Textarea" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Text> <http://ogen.ai/ontology/propSchema> "{\"text\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Text content\"}}" ;
+	<http://ogen.ai/ontology/keywords> "text, copy, paragraph" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Body text block." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Text" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Tag> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Tag\",\"description\":\"Tag text\"}}" ;
+	<http://ogen.ai/ontology/keywords> "tag, label, category" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Tag label." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Tag" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Tabs> <http://ogen.ai/ontology/propSchema> "{\"tabs\":{\"type\":\"string[]\",\"default\":[\"Tab 1\",\"Tab 2\"],\"description\":\"Tab labels\"},\"active\":{\"type\":\"string\",\"default\":\"Tab 1\",\"description\":\"Active tab\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Text> , <http://myapp.com/ui/Button> ;
+	<http://ogen.ai/ontology/keywords> "tabs, navigation, switch" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Tabbed content navigation." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Tabs" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Table> <http://ogen.ai/ontology/propSchema> "{\"columns\":{\"type\":\"string[]\",\"default\":[\"Name\",\"Value\"],\"description\":\"Column headers\"},\"rows\":{\"type\":\"array\",\"default\":[{\"Name\":\"Item\",\"Value\":\"Value\"}],\"description\":\"Row data\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Divider> , <http://myapp.com/ui/Pagination> ;
+	<http://ogen.ai/ontology/keywords> "table, data, grid" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Data table." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Table" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/StatusDot> <http://ogen.ai/ontology/propSchema> "{\"status\":{\"type\":\"string\",\"default\":\"online\",\"enum\":[\"online\",\"offline\",\"busy\"],\"description\":\"Status value\"}}" ;
+	<http://ogen.ai/ontology/keywords> "status, presence, indicator" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Presence indicator dot." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Status Dot" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/StatCard> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Metric\",\"description\":\"Label text\"},\"value\":{\"type\":\"string\",\"default\":\"0\",\"description\":\"Value text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/ProgressBar> , <http://myapp.com/ui/Text> , <http://myapp.com/ui/Heading> ;
+	<http://ogen.ai/ontology/keywords> "stats, card, metric" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Statistic highlight card." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Stat Card" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Spinner> <http://ogen.ai/ontology/propSchema> "{\"size\":{\"type\":\"number\",\"default\":24,\"description\":\"Spinner size\"}}" ;
+	<http://ogen.ai/ontology/keywords> "spinner, loading, progress" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Loading spinner." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Spinner" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Slider> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"value\":{\"type\":\"number\",\"default\":0,\"description\":\"Current value\"},\"min\":{\"type\":\"number\",\"default\":0,\"description\":\"Minimum value\"},\"max\":{\"type\":\"number\",\"default\":100,\"description\":\"Maximum value\"}}" ;
+	<http://ogen.ai/ontology/keywords> "slider, range, input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Range slider input." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Slider" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/SideNav> <http://ogen.ai/ontology/propSchema> "{\"items\":{\"type\":\"string[]\",\"default\":[\"Home\",\"Settings\"],\"description\":\"Nav items\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/StatusDot> , <http://myapp.com/ui/Link> , <http://myapp.com/ui/List> ;
+	<http://ogen.ai/ontology/keywords> "navigation, sidebar, menu" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Vertical navigation menu." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Side Nav" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/SelectField> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"options\":{\"type\":\"string[]\",\"default\":[\"Option A\",\"Option B\"],\"description\":\"Options list\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Select> , <http://myapp.com/ui/Label> ;
+	<http://ogen.ai/ontology/keywords> "select, dropdown, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Labeled dropdown field." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Select Field" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Select> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"options\":{\"type\":\"string[]\",\"default\":[\"Option A\",\"Option B\"],\"description\":\"Options list\"},\"value\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Selected value\"}}" ;
+	<http://ogen.ai/ontology/keywords> "select, dropdown, input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Dropdown selection input." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Select" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/SearchField> <http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"Search\",\"description\":\"Placeholder\"}}" ;
+	<http://ogen.ai/ontology/keywords> "search, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Minimal search input." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Search Field" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/SearchBar> <http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"Search\",\"description\":\"Placeholder\"},\"value\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Search value\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Button> , <http://myapp.com/ui/SearchIcon> , <http://myapp.com/ui/SearchField> ;
+	<http://ogen.ai/ontology/keywords> "search, input, toolbar" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Search input with button." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Search Bar" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/RadioGroup> <http://ogen.ai/ontology/propSchema> "{\"options\":{\"type\":\"string[]\",\"default\":[\"Option A\",\"Option B\"],\"description\":\"Options list\"},\"group\":{\"type\":\"string\",\"default\":\"group\",\"description\":\"Group name\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Radio> ;
+	<http://ogen.ai/ontology/keywords> "radio, group, options" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Group of radio options." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Radio Group" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Radio> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Option\",\"description\":\"Label text\"},\"value\":{\"type\":\"string\",\"default\":\"option\",\"description\":\"Option value\"},\"group\":{\"type\":\"string\",\"default\":\"group\",\"description\":\"Group name\"}}" ;
+	<http://ogen.ai/ontology/keywords> "radio, input, option" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Single radio option." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Radio" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/ProgressBar> <http://ogen.ai/ontology/propSchema> "{\"value\":{\"type\":\"number\",\"default\":0,\"description\":\"Progress value\"}}" ;
+	<http://ogen.ai/ontology/keywords> "progress, loading, status" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Progress indicator." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Progress Bar" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/PasswordField> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Password\",\"description\":\"Field label\"},\"placeholder\":{\"type\":\"string\",\"default\":\"Enter password\",\"description\":\"Placeholder\"}}" ;
+	<http://ogen.ai/ontology/keywords> "password, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Password input with label and placeholder." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Password Field" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Pagination> <http://ogen.ai/ontology/propSchema> "{\"page\":{\"type\":\"number\",\"default\":1,\"description\":\"Current page\"},\"total\":{\"type\":\"number\",\"default\":10,\"description\":\"Total pages\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Text> , <http://myapp.com/ui/Button> ;
+	<http://ogen.ai/ontology/keywords> "pagination, pages, navigation" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Page navigation controls." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Pagination" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Modal> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"Modal title\",\"description\":\"Dialog title\"},\"open\":{\"type\":\"boolean\",\"default\":true,\"description\":\"Open state\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Divider> , <http://myapp.com/ui/Button> , <http://myapp.com/ui/Card> ;
+	<http://ogen.ai/ontology/keywords> "modal, dialog, overlay" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Overlay dialog container." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Modal" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/List> <http://ogen.ai/ontology/propSchema> "{\"items\":{\"type\":\"string[]\",\"default\":[\"Item 1\",\"Item 2\"],\"description\":\"Items list\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Chip> , <http://myapp.com/ui/Tag> , <http://myapp.com/ui/Badge> , <http://myapp.com/ui/Text> ;
+	<http://ogen.ai/ontology/keywords> "list, items" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Simple list of items." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "List" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Link> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Link\",\"description\":\"Link label\"},\"href\":{\"type\":\"string\",\"default\":\"#\",\"description\":\"Target URL\"}}" ;
+	<http://ogen.ai/ontology/keywords> "link, anchor, navigation" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Inline link." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Link" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Label> <http://ogen.ai/ontology/propSchema> "{\"text\":{\"type\":\"string\",\"default\":\"Label\",\"description\":\"Label text\"}}" ;
+	<http://ogen.ai/ontology/keywords> "label, text" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Text label element." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Label" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/InputGroup> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Group label\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/TodoInput> , <http://myapp.com/ui/SearchInput> , <http://myapp.com/ui/PasswordInput> , <http://myapp.com/ui/EmailInput> , <http://myapp.com/ui/Button> , <http://myapp.com/ui/Input> ;
+	<http://ogen.ai/ontology/keywords> "input, group, form" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Grouped inputs with label." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Input Group" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Input> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Field label\"},\"type\":{\"type\":\"string\",\"default\":\"text\",\"description\":\"Input type\"},\"placeholder\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Placeholder\"},\"id\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Input id\"}}" ;
+	<http://ogen.ai/ontology/keywords> "input, text, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Labeled text input." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Input" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Image> <http://ogen.ai/ontology/propSchema> "{\"src\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Image URL\"},\"alt\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Alt text\"},\"width\":{\"type\":\"string\",\"default\":\"100%\",\"description\":\"Width\"}}" ;
+	<http://ogen.ai/ontology/keywords> "image, media, photo" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Responsive image." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Image" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/IconButton> <http://ogen.ai/ontology/propSchema> "{\"icon\":{\"type\":\"string\",\"default\":\"★\",\"description\":\"Icon glyph\"},\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Accessible label\"},\"variant\":{\"type\":\"string\",\"default\":\"ghost\",\"enum\":[\"primary\",\"secondary\",\"ghost\"],\"description\":\"Variant\"},\"size\":{\"type\":\"string\",\"default\":\"md\",\"enum\":[\"sm\",\"md\",\"lg\"],\"description\":\"Size\"}}" ;
+	<http://ogen.ai/ontology/keywords> "icon, button, action" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Button with icon." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Icon Button" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Icon> <http://ogen.ai/ontology/propSchema> "{\"name\":{\"type\":\"string\",\"default\":\"★\",\"description\":\"Icon glyph\"}}" ;
+	<http://ogen.ai/ontology/keywords> "icon, glyph" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Icon glyph display." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Icon" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/HeroSection> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"Hero title\",\"description\":\"Title text\"},\"subtitle\":{\"type\":\"string\",\"default\":\"Subtitle\",\"description\":\"Subtitle text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Image> , <http://myapp.com/ui/Button> , <http://myapp.com/ui/Text> , <http://myapp.com/ui/Heading> ;
+	<http://ogen.ai/ontology/keywords> "hero, banner, header" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Hero banner with title and subtitle." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Hero Section" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/Heading> <http://ogen.ai/ontology/propSchema> "{\"text\":{\"type\":\"string\",\"default\":\"Heading\",\"description\":\"Heading text\"},\"level\":{\"type\":\"number\",\"default\":2,\"description\":\"Heading level\"}}" ;
+	<http://ogen.ai/ontology/keywords> "heading, title, text" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Section heading." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Heading" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/FormField> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Label\",\"description\":\"Field label\"},\"hint\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Helper text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/DatePicker> , <http://myapp.com/ui/Radio> , <http://myapp.com/ui/Checkbox> , <http://myapp.com/ui/ToggleSwitch> , <http://myapp.com/ui/Slider> , <http://myapp.com/ui/Textarea> , <http://myapp.com/ui/Select> , <http://myapp.com/ui/Input> , <http://myapp.com/ui/Label> ;
+	<http://ogen.ai/ontology/keywords> "form, field, label" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Label and hint wrapper for inputs." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Form Field" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Footer> <http://ogen.ai/ontology/propSchema> "{\"text\":{\"type\":\"string\",\"default\":\"Footer text\",\"description\":\"Footer copy\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Text> , <http://myapp.com/ui/Link> ;
+	<http://ogen.ai/ontology/keywords> "footer, layout, navigation" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Page footer area." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Footer" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/EmptyState> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"No data\",\"description\":\"Title text\"},\"description\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Supporting text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Spinner> , <http://myapp.com/ui/Button> , <http://myapp.com/ui/Text> , <http://myapp.com/ui/Heading> ;
+	<http://ogen.ai/ontology/keywords> "empty, placeholder, state" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Placeholder for empty content." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Empty State" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/EmailField> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Email\",\"description\":\"Field label\"},\"placeholder\":{\"type\":\"string\",\"default\":\"user@example.com\",\"description\":\"Placeholder\"}}" ;
+	<http://ogen.ai/ontology/keywords> "email, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Email input with label and placeholder." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Email Field" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Divider> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Optional label\"}}" ;
+	<http://ogen.ai/ontology/keywords> "divider, separator, section" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Section separator." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Divider" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/DatePicker> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Date\",\"description\":\"Field label\"}}" ;
+	<http://ogen.ai/ontology/keywords> "date, picker, input" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Date input field." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Date Picker" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Container> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Section label\"},\"style\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Inline styles\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/RadioGroup> , <http://myapp.com/ui/CheckboxGroup> , <http://myapp.com/ui/SelectField> , <http://myapp.com/ui/ToggleField> , <http://myapp.com/ui/StatCard> , <http://myapp.com/ui/Tabs> , <http://myapp.com/ui/Breadcrumbs> , <http://myapp.com/ui/Alert> , <http://myapp.com/ui/InputGroup> , <http://myapp.com/ui/FormField> , <http://myapp.com/ui/Molecule> ;
+	<http://ogen.ai/ontology/keywords> "container, layout, section" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Layout container with optional label." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Container" ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/Chip> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Chip\",\"description\":\"Chip text\"}}" ;
+	<http://ogen.ai/ontology/keywords> "chip, label, tag" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Compact label chip." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Chip" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/CheckboxGroup> <http://ogen.ai/ontology/propSchema> "{\"options\":{\"type\":\"string[]\",\"default\":[\"Option A\",\"Option B\"],\"description\":\"Options list\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Checkbox> ;
+	<http://ogen.ai/ontology/keywords> "checkbox, group, options" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Group of checkbox options." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Checkbox Group" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Checkbox> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Option\",\"description\":\"Label text\"},\"checked\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Checked state\"}}" ;
+	<http://ogen.ai/ontology/keywords> "checkbox, input, toggle" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Single checkbox control." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Checkbox" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Card> <http://ogen.ai/ontology/propSchema> "{\"title\":{\"type\":\"string\",\"default\":\"Card title\",\"description\":\"Title text\"},\"subtitle\":{\"type\":\"string\",\"default\":\"Subtitle\",\"description\":\"Subtitle text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Badge> , <http://myapp.com/ui/Image> , <http://myapp.com/ui/Text> , <http://myapp.com/ui/Heading> ;
+	<http://ogen.ai/ontology/keywords> "card, content, panel" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Content card with title and subtitle." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Card" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Button> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Button\",\"description\":\"Button text\"},\"variant\":{\"type\":\"string\",\"default\":\"primary\",\"enum\":[\"primary\",\"secondary\"],\"description\":\"Variant\"}}" ;
+	<http://ogen.ai/ontology/keywords> "button, action, cta" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Clickable action button." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Button" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Breadcrumbs> <http://ogen.ai/ontology/propSchema> "{\"items\":{\"type\":\"string[]\",\"default\":[\"Home\",\"Library\"],\"description\":\"Crumb labels\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Link> ;
+	<http://ogen.ai/ontology/keywords> "breadcrumbs, navigation, trail" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Breadcrumb navigation list." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Breadcrumbs" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/Badge> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Badge\",\"description\":\"Badge text\"},\"tone\":{\"type\":\"string\",\"default\":\"neutral\",\"enum\":[\"neutral\",\"success\",\"warning\",\"danger\"],\"description\":\"Badge tone\"}}" ;
+	<http://ogen.ai/ontology/keywords> "badge, status, label" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Small status badge." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Badge" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Avatar> <http://ogen.ai/ontology/propSchema> "{\"name\":{\"type\":\"string\",\"default\":\"User\",\"description\":\"User name\"},\"src\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Image URL\"},\"size\":{\"type\":\"string\",\"default\":\"md\",\"enum\":[\"sm\",\"md\",\"lg\"],\"description\":\"Avatar size\"}}" ;
+	<http://ogen.ai/ontology/keywords> "avatar, user, profile" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "User avatar image or initials." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Avatar" ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/Alert> <http://ogen.ai/ontology/propSchema> "{\"tone\":{\"type\":\"string\",\"default\":\"info\",\"enum\":[\"info\",\"success\",\"warning\",\"danger\"],\"description\":\"Alert tone\"},\"message\":{\"type\":\"string\",\"default\":\"Message\",\"description\":\"Alert text\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Text> , <http://myapp.com/ui/Icon> ;
+	<http://ogen.ai/ontology/keywords> "alert, status, message" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Status or feedback message." ;
+	<http://www.w3.org/2000/01/rdf-schema#label> "Alert" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/SearchIcon> <http://ogen.ai/ontology/propSchema> "{\"name\":{\"type\":\"string\",\"default\":\"🔍\",\"description\":\"Icon glyph\"}}" ;
+	<http://ogen.ai/ontology/keywords> "icon, search" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Search icon glyph." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Search Icon" ;
-	a <http://ogen.ai/ontology/Container> .
-<http://myapp.com/ui/SubmitButton> <http://ogen.ai/ontology/variant> "primary" ;
-	<http://ogen.ai/ontology/disabledState> false ;
-	<http://ogen.ai/ontology/loadingState> false ;
-	<http://ogen.ai/ontology/defaultState> "enabled" ;
-	<http://ogen.ai/ontology/role> "button" ;
-	<http://ogen.ai/ontology/ariaLabel> "Submit button" ;
-	<http://ogen.ai/ontology/propType> "button" ;
-	<http://ogen.ai/ontology/propSchema> "{\"variant\":{\"type\":\"string\",\"default\":\"primary\",\"enum\":[\"primary\",\"secondary\"],\"description\":\"버튼 스타일 변형\"},\"loading\":{\"type\":\"boolean\",\"default\":false,\"description\":\"로딩 상태\"},\"disabled\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비활성화 상태\"},\"label\":{\"type\":\"string\",\"default\":\"Submit\",\"description\":\"버튼 텍스트\"}}" ;
-	<http://ogen.ai/ontology/keywords> "전송, 확인, Submit, Button, CTA, 로그인 버튼" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "제출 버튼. 폼 제출 또는 액션 실행에 사용됨." ;
+	a <http://ogen.ai/ontology/Atom> .
+<http://myapp.com/ui/SubmitButton> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Submit\",\"description\":\"Button text\"},\"variant\":{\"type\":\"string\",\"default\":\"primary\",\"enum\":[\"primary\",\"secondary\"],\"description\":\"Variant\"}}" ;
+	<http://ogen.ai/ontology/keywords> "submit, button, cta" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Primary action button." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Submit Button" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/TodoInput> <http://ogen.ai/ontology/keywords> "TodoInput, Todo Input" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Todo Input component" ;
+<http://myapp.com/ui/TodoInput> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"New task\",\"description\":\"Field label\"},\"type\":{\"type\":\"string\",\"default\":\"text\",\"description\":\"Input type\"},\"placeholder\":{\"type\":\"string\",\"default\":\"Add a task\",\"description\":\"Placeholder\"},\"id\":{\"type\":\"string\",\"default\":\"todo\",\"description\":\"Input id\"}}" ;
+	<http://ogen.ai/ontology/keywords> "todo, input, tasks" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Input for adding tasks." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Todo Input" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/SearchInput> <http://ogen.ai/ontology/keywords> "SearchInput, Search Input" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Search Input component" ;
+<http://myapp.com/ui/SearchInput> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Search\",\"description\":\"Field label\"},\"type\":{\"type\":\"string\",\"default\":\"search\",\"description\":\"Input type\"},\"placeholder\":{\"type\":\"string\",\"default\":\"Search\",\"description\":\"Placeholder\"},\"id\":{\"type\":\"string\",\"default\":\"search\",\"description\":\"Input id\"}}" ;
+	<http://ogen.ai/ontology/keywords> "search, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Input configured for search." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Search Input" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/PasswordInput> <http://ogen.ai/ontology/defaultState> "enabled" ;
-	<http://ogen.ai/ontology/ariaRequired> true ;
-	<http://ogen.ai/ontology/role> "textbox" ;
-	<http://ogen.ai/ontology/ariaLabel> "Password input field" ;
-	<http://ogen.ai/ontology/minLength> 8 ;
-	<http://ogen.ai/ontology/required> true ;
-	<http://ogen.ai/ontology/validationRules> "{\"minLength\":8,\"message\":\"비밀번호는 최소 8자 이상이어야 합니다\"}" ;
-	<http://ogen.ai/ontology/propType> "input[type='password']" ;
-	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"Enter password\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"password\",\"description\":\"입력 타입\"},\"showToggle\":{\"type\":\"boolean\",\"default\":false,\"description\":\"비밀번호 표시/숨김 토글\"}}" ;
-	<http://ogen.ai/ontology/keywords> "비밀번호, Password, Input, 입력, Secret" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "비밀번호 입력 필드. 최소 길이 검증을 포함함." ;
+<http://myapp.com/ui/PasswordInput> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Password\",\"description\":\"Field label\"},\"type\":{\"type\":\"string\",\"default\":\"password\",\"description\":\"Input type\"},\"placeholder\":{\"type\":\"string\",\"default\":\"Enter password\",\"description\":\"Placeholder\"},\"id\":{\"type\":\"string\",\"default\":\"password\",\"description\":\"Input id\"}}" ;
+	<http://ogen.ai/ontology/keywords> "password, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Input configured for password." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Password Input" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/EmailInput> <http://ogen.ai/ontology/defaultState> "enabled" ;
-	<http://ogen.ai/ontology/ariaRequired> true ;
-	<http://ogen.ai/ontology/role> "textbox" ;
-	<http://ogen.ai/ontology/ariaLabel> "Email input field" ;
-	<http://ogen.ai/ontology/pattern> "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
-	<http://ogen.ai/ontology/required> true ;
-	<http://ogen.ai/ontology/validationRules> "{\"pattern\":\"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\",\"message\":\"올바른 이메일 형식이 아닙니다\"}" ;
-	<http://ogen.ai/ontology/propType> "input[type='email']" ;
-	<http://ogen.ai/ontology/propSchema> "{\"placeholder\":{\"type\":\"string\",\"default\":\"user@example.com\",\"description\":\"플레이스홀더 텍스트\"},\"required\":{\"type\":\"boolean\",\"default\":true,\"description\":\"필수 입력 여부\"},\"label\":{\"type\":\"string\",\"description\":\"라벨 텍스트\"},\"type\":{\"type\":\"string\",\"default\":\"email\",\"description\":\"입력 타입\"}}" ;
-	<http://ogen.ai/ontology/keywords> "이메일, Email, Input, 입력, Email Field" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "이메일 입력 필드. 이메일 형식 검증을 포함함." ;
+<http://myapp.com/ui/EmailInput> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Email\",\"description\":\"Field label\"},\"type\":{\"type\":\"string\",\"default\":\"email\",\"description\":\"Input type\"},\"placeholder\":{\"type\":\"string\",\"default\":\"user@example.com\",\"description\":\"Placeholder\"},\"id\":{\"type\":\"string\",\"default\":\"email\",\"description\":\"Input id\"}}" ;
+	<http://ogen.ai/ontology/keywords> "email, input, field" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Input configured for email." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Email Input" ;
 	a <http://ogen.ai/ontology/Atom> .
-<http://myapp.com/ui/Molecule> <http://ogen.ai/ontology/keywords> "Molecule, Molecule" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Molecule component" ;
+<http://myapp.com/ui/Molecule> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Section label\"},\"style\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Inline styles\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/InputGroup> , <http://myapp.com/ui/FormField> ;
+	<http://ogen.ai/ontology/keywords> "composite, container" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Generic composite container." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Molecule" ;
-	a <http://ogen.ai/ontology/Container> .
-<http://myapp.com/ui/KanbanBoard> <http://ogen.ai/ontology/keywords> "KanbanBoard, Kanban Board" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Kanban Board component" ;
+	a <http://ogen.ai/ontology/Molecule> .
+<http://myapp.com/ui/KanbanBoard> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Board\",\"description\":\"Board title\"},\"style\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Inline styles\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/StatusDot> , <http://myapp.com/ui/Card> , <http://myapp.com/ui/Container> ;
+	<http://ogen.ai/ontology/keywords> "kanban, board, workflow" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Board container for columns." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Kanban Board" ;
 	a <http://ogen.ai/ontology/Organism> .
-<http://myapp.com/ui/TodoList> <http://ogen.ai/ontology/keywords> "TodoList, Todo List" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "Todo List component" ;
+<http://myapp.com/ui/TodoList> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Tasks\",\"description\":\"Section title\"},\"style\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Inline styles\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/Button> , <http://myapp.com/ui/List> , <http://myapp.com/ui/TodoInput> ;
+	<http://ogen.ai/ontology/keywords> "todo, list, tasks" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "List container for tasks." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Todo List" ;
-	a <http://ogen.ai/ontology/Container> .
-<http://myapp.com/ui/LoginCard> <http://ogen.ai/ontology/role> "form" ;
-	<http://ogen.ai/ontology/ariaLabel> "Login card container" ;
-	<http://ogen.ai/ontology/spacing> "16px" ;
-	<http://ogen.ai/ontology/flexDirection> "column" ;
-	<http://ogen.ai/ontology/layoutType> "flex" ;
-	<http://ogen.ai/ontology/propSchema> "{\"width\":{\"type\":\"string\",\"default\":\"400px\",\"description\":\"카드 너비\"},\"shadow\":{\"type\":\"boolean\",\"default\":true,\"description\":\"그림자 효과\"},\"redirectTo\":{\"type\":\"string\",\"description\":\"로그인 성공 후 이동할 경로\"},\"label\":{\"type\":\"string\",\"description\":\"카드 제목\"}}" ;
-	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/LoginActions> , <http://myapp.com/ui/PasswordField> , <http://myapp.com/ui/EmailField> ;
-	<http://ogen.ai/ontology/keywords> "로그인, 인증, Sign In, Authentication, Entry, Login" ;
-	<http://www.w3.org/2000/01/rdf-schema#comment> "사용자 인증을 위한 표준 컨테이너. 이메일과 비밀번호 입력을 포함함." ;
+	a <http://ogen.ai/ontology/Organism> .
+<http://myapp.com/ui/LoginCard> <http://ogen.ai/ontology/propSchema> "{\"label\":{\"type\":\"string\",\"default\":\"Login\",\"description\":\"Card title\"},\"style\":{\"type\":\"string\",\"default\":\"\",\"description\":\"Inline styles\"}}" ;
+	<http://ogen.ai/ontology/hasPart> <http://myapp.com/ui/SubmitButton> , <http://myapp.com/ui/PasswordField> , <http://myapp.com/ui/EmailField> ;
+	<http://ogen.ai/ontology/keywords> "login, auth, card, form" ;
+	<http://www.w3.org/2000/01/rdf-schema#comment> "Authentication container with email, password, and submit." ;
 	<http://www.w3.org/2000/01/rdf-schema#label> "Login Card" ;
 	a <http://ogen.ai/ontology/Organism> .
 <http://ogen.ai/ontology/theme> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> ;

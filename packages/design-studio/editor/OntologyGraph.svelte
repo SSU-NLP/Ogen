@@ -104,6 +104,15 @@ export let selected: string | null = null;
     }
   }
 
+  function applyHoverFocus(id: string | null) {
+    if (!cy) return;
+    cy.elements().removeClass('faded').removeClass('highlight');
+    if (!id || !cy.getElementById(id).length) return;
+    cy.elements().addClass('faded');
+    const focus = cy.getElementById(id).closedNeighborhood();
+    focus.removeClass('faded').addClass('highlight');
+  }
+
   function applyThemeStyles(): void {
     if (!cy) return;
     const nodeText = theme === 'dark' ? '#cdd6f4' : '#111827';
@@ -179,6 +188,19 @@ export let selected: string | null = null;
           }
         },
         {
+          selector: 'node.highlight',
+          style: {
+            'border-width': 3,
+            'border-color': '#7dd3fc'
+          }
+        },
+        {
+          selector: 'node.faded',
+          style: {
+            opacity: 0.15
+          }
+        },
+        {
           selector: 'edge',
           style: {
             width: 2,
@@ -191,6 +213,20 @@ export let selected: string | null = null;
             color: edgeText,
             'text-rotation': 'autorotate'
           }
+        },
+        {
+          selector: 'edge.highlight',
+          style: {
+            width: 2.6,
+            'line-color': theme === 'dark' ? '#7dd3fc' : '#0284c7',
+            'target-arrow-color': theme === 'dark' ? '#7dd3fc' : '#0284c7'
+          }
+        },
+        {
+          selector: 'edge.faded',
+          style: {
+            opacity: 0.12
+          }
         }
       ]
     });
@@ -198,6 +234,15 @@ export let selected: string | null = null;
     cy.on('tap', 'node', (evt: cytoscape.EventObject) => {
       const id = evt.target.id();
       dispatch('select', id);
+    });
+
+    cy.on('mouseover', 'node', (evt: cytoscape.EventObject) => {
+      const id = evt.target.id();
+      applyHoverFocus(id);
+    });
+
+    cy.on('mouseout', 'node', () => {
+      applyHoverFocus(null);
     });
 
     lastGraphSignature = computeGraphSignature(metadata);
@@ -282,4 +327,5 @@ export let selected: string | null = null;
       radial-gradient(900px 500px at 80% 30%, rgba(16, 163, 127, 0.10), transparent 55%),
       var(--ds-bg);
   }
+
 </style>

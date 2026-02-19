@@ -4,7 +4,8 @@
     OgentRuntime, 
     UIRenderer, 
     generateTTLFromDesignSystem,
-    type ChatMessage
+    type ChatMessage,
+    type ComponentMetadata
   } from '@ogen/svelte';
   import { designSystem, designSystemMetadata as defaultDesignSystemMetadata } from '$lib/ds';
 
@@ -14,13 +15,13 @@
   let chatContainer: HTMLElement | null = null;
   let connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
   let loadingUIMessages: Set<string> = new Set();
+  let activeMetadata: Record<string, ComponentMetadata> = defaultDesignSystemMetadata;
 
   onMount(() => {
     // Check if design system is already connected to backend
     const connectionKey = 'ogen_design_system_hash';
 
     // Allow Design Studio to override metadata via localStorage
-    let activeMetadata = defaultDesignSystemMetadata;
     try {
       const storedMetadata = localStorage.getItem('ogen_design_system_metadata');
       if (storedMetadata) {
@@ -199,7 +200,7 @@
               {:else}
                 {message.content}
               {/if}
-              {#if message.isStreaming && !message.uiTree}
+            {#if message.isStreaming && !message.uiTree}
                 <span class="cursor">▋</span>
               {/if}
             </div>
@@ -225,7 +226,8 @@
               <div class="message-ui">
                 <UIRenderer 
                   node={message.uiTree} 
-                  components={designSystem} 
+                  components={designSystem}
+                  metadata={activeMetadata}
                 />
               </div>
             {/if}

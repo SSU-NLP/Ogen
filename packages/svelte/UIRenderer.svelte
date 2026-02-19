@@ -1,13 +1,31 @@
 <script lang="ts">
-  
-    export let node: any; 
-    export let components: Record<string, any> = {}; 
+    import type { ComponentMetadata } from './ttl-generator';
 
-    $: Component = components[node.type] || components['default'] || null;
-    $: props = node.props || {};
+    export let node: any;
+    export let components: Record<string, any> = {};
+    export let metadata: Record<string, ComponentMetadata> = {};
+
+    $: Component = components[node?.type] || components['default'] || null;
+
+    function applyDefaults(type: string, props: Record<string, any>): Record<string, any> {
+      const meta = metadata[type];
+      const schema = meta?.propSchema;
+      if (!schema) return props;
+
+      const next = { ...props };
+      for (const [key, spec] of Object.entries(schema)) {
+        if (next[key] === undefined && spec?.default !== undefined) {
+          next[key] = spec.default;
+        }
+      }
+      return next;
+    }
+
+    $: props = applyDefaults(node?.type, node?.props || {});
+    $: meta = metadata[node?.type];
     $: safeProps = {
       ...props,
-      label: node.label || props.label || node.type
+      label: node?.label || props.label || meta?.label || node?.type
     };
   </script>
   
@@ -15,7 +33,7 @@
     <svelte:component this={Component} {...safeProps}>
       {#if node.children && node.children.length > 0}
         {#each node.children as child}
-          <svelte:self node={child} {components} />
+          <svelte:self node={child} {components} {metadata} />
         {/each}
       {/if}
     </svelte:component>
