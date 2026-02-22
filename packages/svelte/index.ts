@@ -243,6 +243,11 @@ export class OgentRuntime {
         this.setState({ messages });
     }
 
+    private removeMessage(messageId: string) {
+        const messages = this.state.messages.filter(msg => msg.id !== messageId);
+        this.setState({ messages });
+    }
+
     async sendMessage(query: string, context: string = "default"): Promise<void> {
         if (!query.trim() || this.state.connectionStatus !== 'connected') {
             return;
@@ -495,14 +500,27 @@ export class OgentRuntime {
     }
 
     private handleStreamChunk(chunk: StreamChunk, messageId: string): void {
-        const currentMessage = this.state.messages.find(m => m.id === messageId);
-        if (!currentMessage) return;
-
         switch (chunk.type) {
             case 'text':
                 if (chunk.content) {
+                    if (!this.currentStreamingMessageId) {
+                        const assistantMessage: ChatMessage = {
+                            id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                            role: 'assistant',
+                            content: '',
+                            timestamp: new Date(),
+                            isStreaming: true
+                        };
+                        this.addMessage(assistantMessage);
+                        this.currentStreamingMessageId = assistantMessage.id;
+                    }
+
+                    const targetId = this.currentStreamingMessageId;
+                    const currentMessage = this.state.messages.find(m => m.id === targetId);
+                    if (!currentMessage || !targetId) return;
+
                     const newContent = currentMessage.content + chunk.content;
-                    this.updateMessage(messageId, {
+                    this.updateMessage(targetId, {
                         content: newContent
                     });
                 }
@@ -510,18 +528,44 @@ export class OgentRuntime {
 
             case 'ui':
                 if (chunk.uiTree) {
-                    this.updateMessage(messageId, {
+                    const currentId = this.currentStreamingMessageId;
+                    const currentMessage = currentId ? this.state.messages.find(m => m.id === currentId) : null;
+
+                    if (currentId && currentMessage) {
+                        if (!currentMessage.content) {
+                            this.removeMessage(currentId);
+                        } else {
+                            this.updateMessage(currentId, { isStreaming: false });
+                        }
+                    }
+
+                    const uiMessage: ChatMessage = {
+                        id: `assistant-ui-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        role: 'assistant',
+                        content: '',
                         uiTree: chunk.uiTree,
-                        content: currentMessage.content || '✅ UI가 생성되었습니다!'
-                    });
+                        timestamp: new Date()
+                    };
+                    this.addMessage(uiMessage);
+                    this.currentStreamingMessageId = null;
                 }
                 break;
 
             case 'error':
-                this.updateMessage(messageId, {
-                    content: `❌ Error: ${chunk.error || 'Unknown error'}`,
-                    isStreaming: false
-                });
+                if (this.currentStreamingMessageId) {
+                    this.updateMessage(this.currentStreamingMessageId, {
+                        content: `❌ Error: ${chunk.error || 'Unknown error'}`,
+                        isStreaming: false
+                    });
+                } else {
+                    this.addMessage({
+                        id: `assistant-error-${Date.now()}`,
+                        role: 'assistant',
+                        content: `❌ Error: ${chunk.error || 'Unknown error'}`,
+                        timestamp: new Date(),
+                        isStreaming: false
+                    });
+                }
                 this.setState({
                     status: 'error',
                     error: chunk.error || 'Unknown error'
@@ -530,9 +574,11 @@ export class OgentRuntime {
                 break;
 
             case 'done':
-                this.updateMessage(messageId, {
-                    isStreaming: false
-                });
+                if (this.currentStreamingMessageId) {
+                    this.updateMessage(this.currentStreamingMessageId, {
+                        isStreaming: false
+                    });
+                }
                 this.currentStreamingMessageId = null;
                 break;
         }
