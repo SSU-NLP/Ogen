@@ -29,20 +29,20 @@ app.add_middleware(
 
 # --- 1. 엔진 초기화 (서버 시작 시 1회 로드) ---
 # 온톨로지는 라이브러리 내부에서 자동 로드됨
-# Prefer OpenRouter for demo (supports many models) if provided.
-API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+API_KEY = os.getenv("OPENAI_API_KEY")
 BASE_URL = os.getenv("OPENAI_BASE_URL")
 
 if not API_KEY:
-    raise ValueError("OPENROUTER_API_KEY 또는 OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.")
-
-# If user provides OpenRouter key and no explicit base URL, default to OpenRouter.
-if not BASE_URL and os.getenv("OPENROUTER_API_KEY"):
-    BASE_URL = "https://openrouter.ai/api/v1"
+    raise ValueError("OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.")
 
 try:
     # 엔진 인스턴스 생성 (온톨로지만 로드, 사용자 데이터는 API로 받음)
-    engine = OgenEngine(openai_api_key=API_KEY, openai_base_url=BASE_URL)
+    engine = OgenEngine(
+        openai_api_key=API_KEY,
+        openai_base_url=BASE_URL,
+        persistence_dir=os.path.join(os.path.dirname(__file__), "ogen_data"),
+        model_config_path=os.getenv("OGEN_MODEL_CONFIG_PATH"),
+    )
     print("✅ Ogen Engine initialized successfully (Ontology loaded).")
 
     # UI 생성 파이프라인 생성
@@ -53,9 +53,8 @@ try:
 
     # Agent 생성 (Tool 포함)
     # Use an OpenAI-compatible tool-calling model.
-    chat_model = "openai/gpt-4o-mini" if BASE_URL else "gpt-4o-mini"
     llm = ChatOpenAI(
-        model=chat_model,
+        model="gpt-5",
         api_key=SecretStr(API_KEY),
         base_url=BASE_URL,
         temperature=0,
@@ -95,7 +94,34 @@ class ConnectRequest(BaseModel):
     base_iri: str = "http://myapp.com/ui/"
     force: bool = False
 
+
 # --- 3. API 엔드포인트 ---
+def _prune_with_model(model: str, context: list[dict], top_k: int) -> list[str]:
+    ids = [c.get("id") or c.get("type") for c in context if isinstance(c, dict)]
+    ids = [i for i in ids if isinstance(i, str)]
+    response = engine.client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": 'Select top_k ids from the list. Return JSON {"selected": [..]}',
+            },
+            {
+                "role": "user",
+                "content": json.dumps({"ids": ids, "top_k": top_k}, ensure_ascii=False),
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=1,
+    )
+    raw = response.choices[0].message.content or "{}"
+    parsed = json.loads(raw)
+    selected = parsed.get("selected")
+    if not isinstance(selected, list):
+        return []
+    return [s for s in selected if isinstance(s, str)]
+
+
 @app.post("/generate-ui")
 def generate_ui(request: UIRequest):
     """
@@ -105,12 +131,39 @@ def generate_ui(request: UIRequest):
     print(f"📩 Received Query: {request.query} (Context: {request.context})")
 
     try:
-        # 엔진에게 모든 '추론'과 '생성'을 위임합니다.
         result = engine.reason(request.query, context_mode=request.context)
 
-        # 엔진에서 에러를 딕셔너리로 반환했을 경우 처리
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
+
+        pruning_model = os.getenv("OGEN_PRUNING_MODEL")
+        if pruning_model:
+            anchor_uri = result.get("source_anchor")
+            resolved_uri = None
+            if isinstance(anchor_uri, str):
+                if anchor_uri.startswith("http://") or anchor_uri.startswith(
+                    "https://"
+                ):
+                    resolved_uri = anchor_uri
+                else:
+                    for node in engine.nodes:
+                        uri = node.get("uri")
+                        if isinstance(uri, str) and (
+                            uri.endswith(f"/{anchor_uri}")
+                            or uri.endswith(f"#{anchor_uri}")
+                        ):
+                            resolved_uri = uri
+                            break
+
+            if resolved_uri:
+                context = engine.get_subgraph_context(resolved_uri)
+                top_k = int(os.getenv("OGEN_PRUNING_TOP_K") or "6")
+                result["pruning_selected"] = _prune_with_model(
+                    pruning_model, context, top_k
+                )
+                result["allowed_ids"] = [
+                    c.get("id") for c in context if isinstance(c, dict) and c.get("id")
+                ]
 
         return result
 
@@ -166,7 +219,9 @@ async def connect_knowledge_graph(request: ConnectRequest):
     try:
         # 라이브러리 함수 호출 - 모든 로직이 여기에 캡슐화됨
         result = engine.connect_user_data(
-            ttl_string=request.ttl_content, base_iri=request.base_iri, force=request.force
+            ttl_string=request.ttl_content,
+            base_iri=request.base_iri,
+            force=request.force,
         )
         return result  # 그대로 반환
     except ValueError as e:
@@ -268,7 +323,9 @@ def _chat_stream_event_generator(message: str, context: str):
                             except Exception:
                                 continue
 
-                            if isinstance(tool_result, dict) and tool_result.get("success"):
+                            if isinstance(tool_result, dict) and tool_result.get(
+                                "success"
+                            ):
                                 ui_tree = tool_result.get("ui_tree")
                                 if ui_tree:
                                     yield ServerSentEvent(
@@ -282,7 +339,9 @@ def _chat_stream_event_generator(message: str, context: str):
                                     )
 
             yield ServerSentEvent(
-                data=json.dumps({"type": StreamEventType.DONE.value}, ensure_ascii=False)
+                data=json.dumps(
+                    {"type": StreamEventType.DONE.value}, ensure_ascii=False
+                )
             )
 
         except Exception as e:

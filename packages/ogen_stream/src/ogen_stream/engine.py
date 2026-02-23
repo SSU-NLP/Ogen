@@ -15,10 +15,13 @@ class OgenEngine:
         openai_api_key: str,
         persistence_dir: str = "./ogen_data",
         openai_base_url: str | None = None,
+        model_config: dict[str, str] | None = None,
+        model_config_path: str | None = None,
     ):
         self.client = openai.OpenAI(api_key=openai_api_key, base_url=openai_base_url)
         self.persistence_dir = Path(persistence_dir)
         self.persistence_dir.mkdir(exist_ok=True)
+        self.model_config = self._load_model_config(model_config, model_config_path)
 
         self._store_lock = None
 
@@ -84,6 +87,37 @@ class OgenEngine:
             self._store_lock = threading.Lock()
         except Exception:
             self._store_lock = None
+
+    def _load_model_config(
+        self,
+        model_config: dict[str, str] | None,
+        model_config_path: str | None,
+    ) -> dict[str, str]:
+        defaults = {
+            "analysis": "gpt-5",
+            "anchor": "gpt-5",
+            "generation": "gpt-5",
+        }
+
+        config: dict[str, str] = {**defaults}
+
+        if model_config_path:
+            try:
+                with open(model_config_path, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    for key, value in loaded.items():
+                        if isinstance(key, str) and isinstance(value, str) and value:
+                            config[key] = value
+            except Exception as e:
+                print(f"⚠️ Failed to load model config JSON: {e}")
+
+        if model_config:
+            for key, value in model_config.items():
+                if isinstance(key, str) and isinstance(value, str) and value:
+                    config[key] = value
+
+        return config
 
     def _build_index(self):
         """Embed all nodes in the graph (GRAPH_CORE + GRAPH_USER 통합 검색)"""
@@ -216,7 +250,6 @@ class OgenEngine:
             }
         """
 
-        
         system_prompt = """
     You are a UI requirement analyzer. Your job is to analyze user requests and determine what UI components and features are needed.
     
@@ -248,7 +281,7 @@ class OgenEngine:
     """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.model_config.get("analysis", "gpt-5"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -256,7 +289,7 @@ class OgenEngine:
             response_format={"type": "json_object"},
         )
 
-        analysis = json.loads(response.choices[0].message.content)
+        analysis = json.loads(response.choices[0].message.content or "{}")
         print(
             f"📋 Requirement Analysis: {json.dumps(analysis, ensure_ascii=False, indent=2)}"
         )
@@ -264,7 +297,7 @@ class OgenEngine:
         return analysis
 
     def find_anchor_node_with_llm(
-        self, user_query: str, requirement_analysis: dict = None, top_k: int = 5
+        self, user_query: str, requirement_analysis: dict | None = None, top_k: int = 5
     ):
         """
         [Agentic Selection Step]
@@ -332,7 +365,7 @@ class OgenEngine:
     """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.model_config.get("anchor", "gpt-5"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -340,7 +373,7 @@ class OgenEngine:
             response_format={"type": "json_object"},
         )
 
-        decision = json.loads(response.choices[0].message.content)
+        decision = json.loads(response.choices[0].message.content or "{}")
 
         selected_uri = decision.get("selected_uri")
         print(f"🎯 LLM Selected: {selected_uri} (Reason: {decision.get('reason')})")
@@ -461,7 +494,7 @@ class OgenEngine:
     """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.model_config.get("generation", "gpt-5"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -469,7 +502,7 @@ class OgenEngine:
             response_format={"type": "json_object"},
         )
 
-        llm_output = json.loads(response.choices[0].message.content)
+        llm_output = json.loads(response.choices[0].message.content or "{}")
 
         return {
             "source_anchor": requirement_analysis.get("suggested_anchor", "generated"),
@@ -563,7 +596,7 @@ class OgenEngine:
     """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.model_config.get("generation", "gpt-5"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -571,7 +604,7 @@ class OgenEngine:
             response_format={"type": "json_object"},
         )
 
-        llm_output = json.loads(response.choices[0].message.content)
+        llm_output = json.loads(response.choices[0].message.content or "{}")
 
         return {
             "source_anchor": anchor_name,
