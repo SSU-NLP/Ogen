@@ -95,8 +95,9 @@ class OgenEngine:
     ) -> dict[str, str]:
         defaults = {
             "analysis": "gpt-5",
-            "anchor": "gpt-5",
+            "anchor": "gpt-4o-mini",
             "generation": "gpt-5",
+            "pruning": "gpt-5-mini",
         }
 
         config: dict[str, str] = {**defaults}
@@ -154,15 +155,28 @@ class OgenEngine:
             self.node_embeddings = self.embedder.encode(labels)
             print(f"📊 Index rebuilt: {len(self.nodes)} nodes")
 
-    def get_subgraph_context(self, anchor_uri: str, max_depth: int = 2):
+    def get_subgraph_context(
+        self,
+        anchor_uri: str,
+        user_query: str = "",
+        requirement_analysis: dict | None = None,
+        max_depth: int = 2,
+    ):
         """
         [Graph Traversal Step]
         BFS/DFS를 사용하여 Subgraph Context를 동적으로 탐색.
         Hardcoded된 속성(Layout_intents)을 제거하고, 지식 그래프의 모든 속성을 가져옵니다.
+
+        [Agentic Pruning]
+        user_query와 requirement_analysis가 제공되면,
+        LLM을 통해 관련 없는 자식 노드를 가지치기(Pruning)합니다.
         """
         visited = set()
         queue = [(anchor_uri, 0)]  # (uri, depth)
         subgraph = {}
+
+        # Pruning Threshold: 자식이 이보다 많을 때만 LLM 개입 (토큰 절약)
+        pruning_threshold = 3
 
         while queue:
             current_uri, depth = queue.pop(0)  # BFS
@@ -180,13 +194,115 @@ class OgenEngine:
                 continue
 
             # 자식 노드 탐색 (ex: hasPart 관계)
+            # 모든 자식을 가져옴
             children = self._get_children(current_uri)
+
+            # [Agentic Pruning Implementation]
+            # depth가 0이거나(즉, 앵커 직속 자식), 자식이 너무 많을 때 LLM 필터링 수행
+            if (
+                user_query
+                and children
+                and (len(children) >= pruning_threshold or depth == 0)
+            ):
+                print(
+                    f"🤖 Agentic Pruning triggered for {current_uri} ({len(children)} children)"
+                )
+                filtered_children = self._agentic_filter_children(
+                    current_uri, children, user_query, requirement_analysis
+                )
+                print(f"✂️ Pruned: {len(children)} -> {len(filtered_children)} nodes")
+                children = filtered_children
             for child_uri in children:
                 if child_uri not in visited:
                     queue.append((child_uri, depth + 1))
 
         # 결과 포맷팅 (List로 변환)
         return list(subgraph.values())
+
+    def _agentic_filter_children(
+        self,
+        parent_uri: str,
+        children_uris: list,
+        user_query: str,
+        requirement_analysis: dict | None,
+    ) -> list:
+        """
+        [Agentic Pruning Core]
+        LLM에게 자식 노드 목록을 보여주고, 사용자 의도에 맞는 것만 선택하도록 함.
+        """
+        if not children_uris:
+            return []
+
+        # 자식 노드들의 Label 정보를 미리 가져옴 (LLM이 URI만 보고 판단하기 어려울 수 있음)
+        candidates = []
+        for uri in children_uris:
+            props = self._get_node_properties(uri)
+            candidates.append(
+                {
+                    "uri": uri,
+                    "label": props.get("label", uri.split("/")[-1]),
+                    "description": props.get("comment", ""),
+                }
+            )
+
+        analysis_context = ""
+        if requirement_analysis:
+            analysis_context = f"""
+    User Intent: {requirement_analysis.get("user_intent", "N/A")}
+    Required Features: {json.dumps(requirement_analysis.get("required_features", []), ensure_ascii=False)}
+    """
+
+        system_prompt = """
+    You are a Knowledge Graph Pruning Agent.
+    Your task is to filter a list of child components and keep ONLY those that are relevant to the user's request.
+
+    [Rules]
+    1. Select components that are necessary to fulfill the user's intent.
+    2. If a component is a container or structural element (like 'Wrapper', 'Section'), keep it to maintain layout.
+    3. Remove components that are clearly irrelevant (e.g., 'MarketingBanner' when user asks for 'Settings').
+    4. Return the list of selected URIs in JSON format.
+
+    Output Schema: {"selected_uris": ["uri1", "uri2"]}
+    """
+
+        user_prompt = f"""
+    User Query: "{user_query}"
+    {analysis_context}
+
+    Parent Component: {parent_uri}
+
+    Candidates (Children):
+    {json.dumps(candidates, ensure_ascii=False, indent=2)}
+
+    Select relevant children URIs.
+    """
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_config.get("pruning", "gpt-4o-mini"),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
+
+            result = json.loads(response.choices[0].message.content or "{}")
+            selected = result.get("selected_uris", [])
+
+            # 입력된 URI들 중에 실제로 존재하는 것만 필터링 (건전성 검사)
+            valid_selected = [uri for uri in selected if uri in children_uris]
+
+            # 만약 LLM이 아무것도 선택하지 않았다면? -> 너무 공격적인 가지치기일 수 있으므로,
+            # 안전하게 원래 리스트를 반환하거나(보수적), 빈 리스트를 반환(공격적).
+            # 여기서는 '필수적인게 없다'고 판단했을 수 있으므로 빈 리스트 반환이 맞지만,
+            # 혹시 모를 에러를 대비해 fallback으로 최소 1개는 남겨야 할 수도 있음.
+            # 일단은 그대로 반환.
+            return valid_selected
+
+        except Exception as e:
+            print(f"⚠️ Agentic pruning failed: {e}. Returning all children.")
+            return children_uris
 
     def _get_node_properties(self, uri: str) -> dict:
         """단일 노드의 모든 속성을 동적으로 조회 (Hardcoding 제거)"""
@@ -429,7 +545,11 @@ class OgenEngine:
         # Step 3: Graph Context 검색 (Dynamic Traversal)
         # Note: Removing the split logic as requested. Metadata is typically enough, or we use full URI.
         print(f"📚 Step 3: Retrieving graph context for anchor: {anchor_uri}")
-        retrieved_children = self.get_subgraph_context(anchor_uri)
+        retrieved_children = self.get_subgraph_context(
+            anchor_uri,
+            user_query=user_query,
+            requirement_analysis=requirement_analysis,
+        )
 
         # Step 4 & 5: UI 생성
         return self._generate_ui_with_context(

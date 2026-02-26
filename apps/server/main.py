@@ -4,8 +4,8 @@ from pydantic import BaseModel, SecretStr
 from typing import Any, cast
 from dotenv import load_dotenv
 import os
-import uvicorn
 import json
+import uvicorn
 from sse_starlette.sse import EventSourceResponse
 from sse_starlette.event import ServerSentEvent
 from langchain_openai import ChatOpenAI
@@ -96,32 +96,6 @@ class ConnectRequest(BaseModel):
 
 
 # --- 3. API 엔드포인트 ---
-def _prune_with_model(model: str, context: list[dict], top_k: int) -> list[str]:
-    ids = [c.get("id") or c.get("type") for c in context if isinstance(c, dict)]
-    ids = [i for i in ids if isinstance(i, str)]
-    response = engine.client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": 'Select top_k ids from the list. Return JSON {"selected": [..]}',
-            },
-            {
-                "role": "user",
-                "content": json.dumps({"ids": ids, "top_k": top_k}, ensure_ascii=False),
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=1,
-    )
-    raw = response.choices[0].message.content or "{}"
-    parsed = json.loads(raw)
-    selected = parsed.get("selected")
-    if not isinstance(selected, list):
-        return []
-    return [s for s in selected if isinstance(s, str)]
-
-
 @app.post("/generate-ui")
 def generate_ui(request: UIRequest):
     """
@@ -135,35 +109,6 @@ def generate_ui(request: UIRequest):
 
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
-
-        pruning_model = os.getenv("OGEN_PRUNING_MODEL")
-        if pruning_model:
-            anchor_uri = result.get("source_anchor")
-            resolved_uri = None
-            if isinstance(anchor_uri, str):
-                if anchor_uri.startswith("http://") or anchor_uri.startswith(
-                    "https://"
-                ):
-                    resolved_uri = anchor_uri
-                else:
-                    for node in engine.nodes:
-                        uri = node.get("uri")
-                        if isinstance(uri, str) and (
-                            uri.endswith(f"/{anchor_uri}")
-                            or uri.endswith(f"#{anchor_uri}")
-                        ):
-                            resolved_uri = uri
-                            break
-
-            if resolved_uri:
-                context = engine.get_subgraph_context(resolved_uri)
-                top_k = int(os.getenv("OGEN_PRUNING_TOP_K") or "6")
-                result["pruning_selected"] = _prune_with_model(
-                    pruning_model, context, top_k
-                )
-                result["allowed_ids"] = [
-                    c.get("id") for c in context if isinstance(c, dict) and c.get("id")
-                ]
 
         return result
 

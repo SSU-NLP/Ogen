@@ -9,3 +9,5 @@
 node_modules
 
 experiments
+
+.DS_Store
