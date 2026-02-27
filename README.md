@@ -29,7 +29,7 @@ LLM-based UI generation suffers from **design system inconsistency** (hallucinat
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **KG-Grounded Reasoning** | 5-stage pipeline generating UI grounded in a design system Knowledge Graph |
+| 🧠 **KG-Grounded Reasoning** | 4-stage pipeline generating UI grounded in a design system Knowledge Graph |
 | 🎨 **Ontology-Based Design System** | Atomic Design (Atom/Molecule/Organism/Template) + RDF/TTL ontology |
 | 💬 **Streaming Chat Interface** | SSE-based real-time streaming conversational UI generation |
 | 🔧 **Design Studio** | Component scan → metadata editing → TTL generation → backend sync |
@@ -96,8 +96,8 @@ ogen-ui/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/seonghyeoncho/ogen-ui.git
-cd ogen-ui
+git clone https://github.com/SSU-NLP/Ogen.git
+cd Ogen
 
 # 2. Install Python dependencies
 uv sync
