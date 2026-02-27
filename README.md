@@ -224,19 +224,3 @@ The **Design Studio** UI (`/design-studio`) provides a no-code workflow:
 5. **Sync** — The generated TTL is sent to the backend, which loads it into the Knowledge Graph for KG-grounded reasoning.
 
 > Even when using Design Studio, you still need to manually add the `import` and registry entry in `ds.ts` for the UI renderer to resolve the component at runtime.
-
----
-
-## Citation
-
-```bibtex
-@inproceedings{cho2026ogen,
-  title     = {Ogen: Ontology-Grounded Generative UI Engine},
-  author    = {Cho, Seonghyeon},
-  booktitle = {Proceedings of the 64th Annual Meeting of the
-               Association for Computational Linguistics:
-               System Demonstrations},
-  year      = {2026},
-  url       = {https://github.com/seonghyeoncho/ogen-ui}
-}
-```
