@@ -1,6 +1,6 @@
 """
-UI 생성 함수 제공 (Langchain Tool과 독립적)
-데모 서버에서 Langchain Tool로 래핑하여 사용
+UI generation functions (independent of Langchain Tool)
+Wrapped as a Langchain Tool for use in the demo server
 """
 
 from typing import Optional
@@ -10,11 +10,11 @@ from .ui_generator import UIGenerationPipeline
 
 
 class GenerateUIToolInput(BaseModel):
-    """UI 생성 함수의 입력 스키마"""
+    """Input schema for UI generation function"""
 
-    user_query: str = Field(description="사용자의 UI 생성 요청")
+    user_query: str = Field(description="User's UI generation request")
     context_mode: str = Field(
-        default="default", description="컨텍스트 모드 (default, low-vision 등)"
+        default="default", description="Context mode (default, low-vision, etc.)"
     )
 
 
@@ -22,97 +22,91 @@ def generate_ui(
     pipeline: UIGenerationPipeline, user_query: str, context_mode: str = "default"
 ) -> dict:
     """
-    UI 생성 함수 - Langchain Tool로 래핑하여 사용
+    UI generation function - wrapped as a Langchain Tool for use
 
     Args:
-        pipeline: UIGenerationPipeline 인스턴스
-        user_query: 사용자의 UI 생성 요청
-        context_mode: 컨텍스트 모드
+        pipeline: UIGenerationPipeline instance
+        user_query: User's UI generation request
+        context_mode: Context mode
 
     Returns:
-        dict: UI 생성 결과
+        dict: UI generation result
     """
     try:
-        # 전체 파이프라인 실행
+        # Execute the full pipeline
         requirement_analysis = pipeline.analyze_requirement(user_query)
         anchor_uri = pipeline.find_anchor(user_query, requirement_analysis)
 
-        if anchor_uri:
-            context = pipeline.get_context(
-                anchor_uri,
-                user_query=user_query,
-                requirement_analysis=requirement_analysis,
-            )
-            # anchor_name = anchor_uri.split("/")[-1] # REMOVED
-            result = pipeline.generate_with_context(
-                user_query, requirement_analysis, anchor_uri, context, context_mode
-            )
-        else:
-            # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
-            if requirement_analysis and requirement_analysis.get("suggested_anchor"):
-                suggested = requirement_analysis["suggested_anchor"]
-                # suggested_anchor를 URI 형식으로 변환 시도
-                for node in pipeline.engine.nodes:
-                    if (
-                        suggested.lower() in node["label"].lower()
-                        or node["label"].lower() in suggested.lower()
-                    ):
-                        anchor_uri = node["uri"]
-                        # anchor_name = anchor_uri.split("/")[-1] # REMOVED
-                        context = pipeline.get_context(
-                            anchor_uri,
-                            user_query=user_query,
-                            requirement_analysis=requirement_analysis,
-                        )
-                        result = pipeline.generate_with_context(
-                            user_query,
-                            requirement_analysis,
-                            anchor_uri,
-                            context,
-                            context_mode,
-                        )
-                        break
-                else:
-                    # 여전히 찾지 못하면 요청 분석 결과만으로 UI 생성
-                    result = pipeline.generate_from_analysis(
-                        user_query, requirement_analysis, context_mode
-                    )
-            else:
-                result = pipeline.generate_from_analysis(
-                    user_query, requirement_analysis, context_mode
-                )
+        if not anchor_uri:
+            return {
+                "success": False,
+                "error": "No valid anchor node was found in the knowledge graph.",
+                "reason": "Closed-world synthesis requires a registry-backed KG anchor.",
+                "ui_tree": None,
+                "requirement_analysis": requirement_analysis,
+            }
+
+        context = pipeline.get_context(
+            anchor_uri,
+            user_query=user_query,
+            requirement_analysis=requirement_analysis,
+        )
+
+        if not context:
+            return {
+                "success": False,
+                "error": "No usable subgraph context was retrieved from the knowledge graph.",
+                "reason": "Closed-world synthesis requires KG-backed component context.",
+                "ui_tree": None,
+                "source_anchor": anchor_uri,
+                "requirement_analysis": requirement_analysis,
+            }
+
+        result = pipeline.generate_with_context(
+            user_query, requirement_analysis, anchor_uri, context, context_mode
+        )
+
+        if result.get("error"):
+            return {
+                "success": False,
+                "error": result["error"],
+                "reason": result.get("reason"),
+                "ui_tree": result.get("generated_spec"),
+                "source_anchor": result.get("source_anchor"),
+                "requirement_analysis": requirement_analysis,
+            }
 
         return {
             "success": True,
             "ui_tree": result.get("generated_spec"),
             "source_anchor": result.get("source_anchor"),
             "requirement_analysis": requirement_analysis,
+            "validated": result.get("validated"),
+            "validation_attempts": result.get("validation_attempts"),
         }
     except Exception as e:
         return {"success": False, "error": str(e), "ui_tree": None}
 
 
-# Langchain Tool 래퍼 (선택적, 데모 서버에서 사용)
+# Langchain Tool wrapper (optional, used in demo server)
 def create_langchain_tool(pipeline: UIGenerationPipeline):
     """
-    Langchain Tool 생성 함수 (선택적 의존성)
-    데모 서버에서 langchain_core.tools.BaseTool을 사용하여 래핑
+    Create a Langchain Tool (optional dependency)
+    Wraps with langchain_core.tools.BaseTool for use in the demo server
 
     Args:
-        pipeline: UIGenerationPipeline 인스턴스
+        pipeline: UIGenerationPipeline instance
 
     Returns:
-        BaseTool: Langchain Tool 인스턴스 (langchain_core가 설치된 경우)
+        BaseTool: Langchain Tool instance (when langchain_core is installed)
 
-    Note:
-        이 함수는 데모 서버에서 사용하며, 라이브러리 자체는 Langchain 의존성이 없습니다.
     """
     try:
         from langchain_core.tools import BaseTool
         from langchain_core.tools.base import ArgsSchema
 
         class GenerateUITool(BaseTool):
-            """UI 생성 툴 - Agent가 필요할 때 호출"""
+            """UI generation tool - called when the Agent needs it"""
 
             name: str = "generate_ui"
             description: str = """
@@ -162,75 +156,3 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
             "langchain_core is required to create Langchain Tool. "
             "Install it with: pip install langchain-core"
         )
-
-    def _run(self, user_query: str, context_mode: str = "default") -> dict:
-        """
-        UI 생성 실행
-
-        Args:
-            user_query: 사용자의 UI 생성 요청
-            context_mode: 컨텍스트 모드
-
-        Returns:
-            dict: UI 생성 결과
-        """
-        try:
-            # 전체 파이프라인 실행
-            requirement_analysis = self.pipeline.analyze_requirement(user_query)
-            anchor_uri = self.pipeline.find_anchor(user_query, requirement_analysis)
-
-            if anchor_uri:
-                context = self.pipeline.get_context(
-                    anchor_uri,
-                    user_query=user_query,
-                    requirement_analysis=requirement_analysis,
-                )
-                # anchor_name = anchor_uri.split("/")[-1] # REMOVED
-                result = self.pipeline.generate_with_context(
-                    user_query, requirement_analysis, anchor_uri, context, context_mode
-                )
-            else:
-                # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
-                if requirement_analysis and requirement_analysis.get(
-                    "suggested_anchor"
-                ):
-                    suggested = requirement_analysis["suggested_anchor"]
-                    # suggested_anchor를 URI 형식으로 변환 시도
-                    for node in self.pipeline.engine.nodes:
-                        if (
-                            suggested.lower() in node["label"].lower()
-                            or node["label"].lower() in suggested.lower()
-                        ):
-                            anchor_uri = node["uri"]
-                            # anchor_name = anchor_uri.split("/")[-1] # REMOVED
-                            context = self.pipeline.get_context(
-                                anchor_uri,
-                                user_query=user_query,
-                                requirement_analysis=requirement_analysis,
-                            )
-                            result = self.pipeline.generate_with_context(
-                                user_query,
-                                requirement_analysis,
-                                anchor_uri,
-                                context,
-                                context_mode,
-                            )
-                            break
-                    else:
-                        # 여전히 찾지 못하면 요청 분석 결과만으로 UI 생성
-                        result = self.pipeline.generate_from_analysis(
-                            user_query, requirement_analysis, context_mode
-                        )
-                else:
-                    result = self.pipeline.generate_from_analysis(
-                        user_query, requirement_analysis, context_mode
-                    )
-
-            return {
-                "success": True,
-                "ui_tree": result.get("generated_spec"),
-                "source_anchor": result.get("source_anchor"),
-                "requirement_analysis": requirement_analysis,
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e), "ui_tree": None}

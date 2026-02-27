@@ -15,9 +15,9 @@ from ogen_stream.ui_generator import UIGenerationPipeline
 from ogen_stream.tools import create_langchain_tool
 from ogen_stream.stream import StreamEvent, StreamEventType, format_sse_event
 
-# .env 로드
+# load .env
 load_dotenv()
-
+    
 app = FastAPI(title="Ogen AI Engine API")
 app.add_middleware(
     CORSMiddleware,
@@ -27,8 +27,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 1. 엔진 초기화 (서버 시작 시 1회 로드) ---
-# 온톨로지는 라이브러리 내부에서 자동 로드됨
+# engine initialization (server start)
+# ontology is loaded automatically inside the library
 API_KEY = os.getenv("OPENAI_API_KEY")
 BASE_URL = os.getenv("OPENAI_BASE_URL")
 
@@ -36,7 +36,7 @@ if not API_KEY:
     raise ValueError("OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.")
 
 try:
-    # 엔진 인스턴스 생성 (온톨로지만 로드, 사용자 데이터는 API로 받음)
+    # engine initialization (ontology loaded, user data received via API)
     engine = OgenEngine(
         openai_api_key=API_KEY,
         openai_base_url=BASE_URL,
@@ -45,13 +45,11 @@ try:
     )
     print("✅ Ogen Engine initialized successfully (Ontology loaded).")
 
-    # UI 생성 파이프라인 생성
     pipeline = UIGenerationPipeline(engine)
 
-    # Langchain Tool 생성
     ui_tool = create_langchain_tool(pipeline)
 
-    # Agent 생성 (Tool 포함)
+    # Generate Agent (Tool included)
     # Use an OpenAI-compatible tool-calling model.
     llm = ChatOpenAI(
         model="gpt-5",
@@ -78,15 +76,12 @@ except Exception as e:
     raise e
 
 
-# --- 2. 요청 모델 정의 ---
 class UIRequest(BaseModel):
     query: str
-    context: str = "default"
 
 
 class ChatRequest(BaseModel):
     message: str
-    context: str = "default"
 
 
 class ConnectRequest(BaseModel):
@@ -95,17 +90,16 @@ class ConnectRequest(BaseModel):
     force: bool = False
 
 
-# --- 3. API 엔드포인트 ---
 @app.post("/generate-ui")
 def generate_ui(request: UIRequest):
     """
     [Flow]
     User Request -> FastAPI -> OgenEngine (Search -> Prompt -> LLM) -> JSON Response
     """
-    print(f"📩 Received Query: {request.query} (Context: {request.context})")
+    print(f"📩 Received Query: {request.query}")
 
     try:
-        result = engine.reason(request.query, context_mode=request.context)
+        result = engine.reason(request.query)
 
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
@@ -121,7 +115,7 @@ def generate_ui(request: UIRequest):
 @app.get("/api/connect/status")
 async def check_connection_status():
     """
-    현재 연결 상태 확인 (이미 연결되어 있는지 확인)
+    Check connection status (already connected)
 
     Returns:
         dict: {
@@ -148,11 +142,10 @@ async def check_connection_status():
         }
 
 
-# --- 5. 연결 API 엔드포인트 ---
 @app.post("/api/connect")
 async def connect_knowledge_graph(request: ConnectRequest):
     """
-    프론트엔드에서 지식 그래프를 전송하여 백엔드에 연결
+    Connect knowledge graph from frontend to backend
 
     Returns:
         dict: {
@@ -161,21 +154,22 @@ async def connect_knowledge_graph(request: ConnectRequest):
             "message": str
         }
     """
+
     try:
-        # 라이브러리 함수 호출 - 모든 로직이 여기에 캡슐화됨
         result = engine.connect_user_data(
             ttl_string=request.ttl_content,
             base_iri=request.base_iri,
             force=request.force,
         )
-        return result  # 그대로 반환
+        return result
+
     except ValueError as e:
-        # TTL 파싱 에러 등
         print(f"❌ Connect Error: {str(e)}")
+
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # 기타 서버 에러
         print(f"🔥 Internal Error: {str(e)}")
+
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -194,12 +188,11 @@ def _chat_stream_event_generator(message: str, context: str):
             config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
             emitted_text = ""
 
-            # create_agent expects OpenAI-style message dicts
             inputs = {
                 "messages": [
                     {
                         "role": "user",
-                        "content": f"[context_mode={context}] {message}",
+                        "content": f"{message}",
                     }
                 ]
             }
@@ -304,19 +297,17 @@ def _chat_stream_event_generator(message: str, context: str):
     return event_generator
 
 
-# --- 5. Chat 스트리밍 엔드포인트 ---
 # Browser EventSource requires GET (no request body).
 @app.get("/chat/stream")
 async def chat_stream(message: str, context: str = "default"):
     """
-    Server-Sent Events로 스트리밍 응답
-    Agent가 Tool을 호출하면 UI 이벤트 전송, 텍스트 응답은 텍스트 이벤트로 전송
+    Response with Server-Sent Events
+    When the agent calls a tool, it sends a UI event, and the text response is sent as a text event.
     """
     event_generator = _chat_stream_event_generator(message, context)
     return EventSourceResponse(event_generator())
 
 
-# Keep POST endpoint for non-browser clients.
 @app.post("/chat/stream")
 async def chat_stream_post(request: ChatRequest):
     event_generator = _chat_stream_event_generator(request.message, request.context)

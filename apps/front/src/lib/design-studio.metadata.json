@@ -110,6 +110,39 @@
       }
     }
   },
+  "Input": {
+    "type": "Input",
+    "label": "Input",
+    "comment": "Labeled text input.",
+    "keywords": [
+      "input",
+      "text",
+      "field"
+    ],
+    "category": "Atom",
+    "propSchema": {
+      "label": {
+        "type": "string",
+        "default": "",
+        "description": "Field label"
+      },
+      "type": {
+        "type": "string",
+        "default": "text",
+        "description": "Input type"
+      },
+      "placeholder": {
+        "type": "string",
+        "default": "",
+        "description": "Placeholder"
+      },
+      "id": {
+        "type": "string",
+        "default": "",
+        "description": "Input id"
+      }
+    }
+  },
   "EmailInput": {
     "type": "EmailInput",
     "label": "Email Input",
@@ -843,39 +876,6 @@
         "type": "string",
         "default": "100%",
         "description": "Width"
-      }
-    }
-  },
-  "Input": {
-    "type": "Input",
-    "label": "Input",
-    "comment": "Labeled text input.",
-    "keywords": [
-      "input",
-      "text",
-      "field"
-    ],
-    "category": "Atom",
-    "propSchema": {
-      "label": {
-        "type": "string",
-        "default": "",
-        "description": "Field label"
-      },
-      "type": {
-        "type": "string",
-        "default": "text",
-        "description": "Input type"
-      },
-      "placeholder": {
-        "type": "string",
-        "default": "",
-        "description": "Placeholder"
-      },
-      "id": {
-        "type": "string",
-        "default": "",
-        "description": "Input id"
       }
     }
   },

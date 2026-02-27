@@ -54,7 +54,7 @@ export class OgenRuntime {
         this.endpoint = endpoint;
         this.connectEndpoint = options?.connectEndpoint;
 
-        // autoConnect 옵션이 있고 ttlContent가 있으면 자동 연결
+        // autoConnect option and ttlContent
         if (options?.autoConnect && options?.ttlContent && this.connectEndpoint) {
             this.connect(this.connectEndpoint, options.ttlContent).catch(err => {
                 console.error('Auto-connect failed:', err);
@@ -253,7 +253,7 @@ export class OgentRuntime {
             return;
         }
 
-        // 사용자 메시지 추가
+        // user message add
         const userMessage: ChatMessage = {
             id: `user-${Date.now()}`,
             role: 'user',
@@ -262,7 +262,7 @@ export class OgentRuntime {
         };
         this.addMessage(userMessage);
 
-        // 어시스턴트 메시지 생성 (로딩 상태)
+        // assistant message add (loading state)
         const assistantMessage: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
@@ -297,8 +297,8 @@ export class OgentRuntime {
 
     async sendChatMessage(message: string, context: string = "default"): Promise<void> {
         /**
-         * Chat 스트리밍 메시지 전송 (SSE 사용)
-         * /chat/stream 엔드포인트 사용
+         * Chat streamming message send (SSE)
+         * /chat/stream endpoint
          */
         if (!message.trim() || this.state.connectionStatus !== 'connected') {
             return;
@@ -327,7 +327,7 @@ export class OgentRuntime {
         this.setState({ status: 'loading', error: null });
 
         try {
-            // SSE 엔드포인트 호출
+            // SSE endpoint call
             const url = `${this.endpoint}/chat/stream?message=${encodeURIComponent(message)}&context=${context}`;
             const eventSource = new EventSource(url);
 
@@ -352,27 +352,27 @@ export class OgentRuntime {
             eventSource.onerror = (error) => {
                 eventSource.close();
 
-                // 이미 완료되었거나 의도적으로 종료된 경우 에러 처리 하지 않음
+                // Already completed or intentionally closed, don't handle as error
                 if (isFinished) {
                     this.currentStreamingMessageId = null;
                     return;
                 }
 
-                // 현재 메시지에 내용이 있는지 확인
+                // Check if current message has content
                 const currentMsg = this.state.messages.find(m => m.id === assistantMessage.id);
                 const hasContent = currentMsg && currentMsg.content && currentMsg.content.length > 0;
 
                 if (hasContent) {
-                    // 내용이 있으면 성공으로 처리 (연결이 끊겼지만 데이터는 받음)
+                    // Content received, treat as success (connection closed but data received)
                     console.warn('⚠️ Stream connection closed but content received. Treating as success.');
                     this.updateMessage(assistantMessage.id, {
                         isStreaming: false
                     });
                     this.setState({ status: 'success' });
                 } else {
-                    // 내용이 없으면 진짜 에러
+                    // No content, treat as real error
                     this.updateMessage(assistantMessage.id, {
-                        content: '❌ 연결 오류가 발생했습니다.',
+                        content: '❌ Connection error occurred.',
                         isStreaming: false
                     });
                     this.setState({ status: 'error', error: 'Connection error' });
@@ -424,8 +424,8 @@ export class OgentRuntime {
 
         // UI가 있으면 UI 트리 추가, 없으면 텍스트만
         const content = data.generated_spec
-            ? '✅ UI가 생성되었습니다!'
-            : '응답을 생성했습니다.';
+            ? '✅ UI generated successfully!'
+            : 'Response generated successfully.';
 
         this.updateMessage(messageId, {
             content,
@@ -451,13 +451,13 @@ export class OgentRuntime {
             throw new Error(errText);
         }
 
-        // 스트리밍 응답 처리
+        // Streaming response processing
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
         if (!reader) {
-            // 스트리밍을 지원하지 않으면 일반 응답으로 처리
+            // If streaming is not supported, treat as normal response
             return this.executeNonStreaming(query, context, messageId);
         }
 
@@ -476,14 +476,14 @@ export class OgentRuntime {
                         const chunk: StreamChunk = JSON.parse(line.slice(6));
                         await this.handleStreamChunk(chunk, messageId);
                     } catch (e) {
-                        // JSON 파싱 실패 시 무시
+                        // when json parse error
                         console.warn('Failed to parse stream chunk:', e);
                     }
                 }
             }
         }
 
-        // 남은 버퍼 처리
+        // Process remaining buffer
         if (buffer.startsWith('data: ')) {
             try {
                 const chunk: StreamChunk = JSON.parse(buffer.slice(6));

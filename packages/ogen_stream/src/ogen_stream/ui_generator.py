@@ -93,23 +93,7 @@ class UIGenerationPipeline:
             user_query, requirement_analysis, anchor_name, context, context_mode
         )
 
-    def generate_from_analysis(
-        self, user_query: str, requirement_analysis: dict, context_mode: str = "default"
-    ) -> dict:
-        """
-        요청 분석 결과만으로 UI 생성 (KG에서 컴포넌트를 찾지 못한 경우)
 
-        Args:
-            user_query: 사용자 요청 문자열
-            requirement_analysis: 요청 분석 결과
-            context_mode: 컨텍스트 모드
-
-        Returns:
-            dict: UI 생성 결과
-        """
-        return self.engine._generate_ui_from_analysis(
-            user_query, requirement_analysis, context_mode
-        )
 
     async def generate_ui_stream(
         self, user_query: str, context_mode: str = "default"
@@ -124,56 +108,29 @@ class UIGenerationPipeline:
         Yields:
             StreamEvent: 각 단계별 이벤트
         """
-        # Step 1: 요청 분석
+        # Step 1: Analyze requirement
         yield StreamEvent(
-            type=StreamEventType.TEXT, content="요청을 분석하고 있습니다..."
+            type=StreamEventType.TEXT, content="Analyzing request..."
         )
         requirement_analysis = self.analyze_requirement(user_query)
 
-        # Step 2: 앵커 찾기
+        # Step 2: Find anchor
         yield StreamEvent(
-            type=StreamEventType.TEXT, content="적절한 컴포넌트를 찾고 있습니다..."
+            type=StreamEventType.TEXT, content="Searching for matching component..."
         )
         anchor_uri = self.find_anchor(user_query, requirement_analysis)
 
         if not anchor_uri:
-            # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
-            if requirement_analysis and requirement_analysis.get("suggested_anchor"):
-                suggested = requirement_analysis["suggested_anchor"]
-                # suggested_anchor를 URI 형식으로 변환 시도
-                for node in self.engine.nodes:
-                    if (
-                        suggested.lower() in node["label"].lower()
-                        or node["label"].lower() in suggested.lower()
-                    ):
-                        anchor_uri = node["uri"]
-                        break
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                error="No valid anchor node was found in the knowledge graph.",
+            )
+            return
 
-                if not anchor_uri:
-                    # 여전히 찾지 못하면 요청 분석 결과만으로 UI 생성
-                    yield StreamEvent(
-                        type=StreamEventType.TEXT, content="UI를 생성하고 있습니다..."
-                    )
-                    result = self.generate_from_analysis(
-                        user_query, requirement_analysis, context_mode
-                    )
-                    yield StreamEvent(
-                        type=StreamEventType.UI, uiTree=result.get("generated_spec")
-                    )
-                    yield StreamEvent(type=StreamEventType.DONE)
-                    return
-            else:
-                yield StreamEvent(
-                    type=StreamEventType.ERROR,
-                    error="요청하신 UI 컴포넌트를 지식 그래프에서 찾을 수 없습니다.",
-                )
-                return
-
-        # Step 3: Graph Context 검색
-        # anchor_name = anchor_uri.split("/")[-1]  # REMOVED
+        # Step 3: Retrieve Graph Context
         yield StreamEvent(
             type=StreamEventType.TEXT,
-            content=f"{anchor_uri} 컴포넌트 정보를 가져오고 있습니다...",
+            content=f"Retrieving component info for {anchor_uri}...",
         )
         context = self.get_context(
             anchor_uri,
@@ -181,13 +138,27 @@ class UIGenerationPipeline:
             requirement_analysis=requirement_analysis,
         )
 
-        # Step 4: UI 생성
+        if not context:
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                error="No usable subgraph context was retrieved from the knowledge graph.",
+            )
+            return
+
+        # Step 4: Generate UI
         yield StreamEvent(
-            type=StreamEventType.TEXT, content="UI를 생성하고 있습니다..."
+            type=StreamEventType.TEXT, content="Generating UI..."
         )
         result = self.generate_with_context(
             user_query, requirement_analysis, anchor_uri, context, context_mode
         )
+
+        if result.get("error"):
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                error=result["error"],
+            )
+            return
 
         yield StreamEvent(type=StreamEventType.UI, uiTree=result.get("generated_spec"))
         yield StreamEvent(type=StreamEventType.DONE)
@@ -247,25 +218,27 @@ def generate_ui_spec(
     """
     pipeline = UIGenerationPipeline(engine)
 
-    # 요청 분석이 없으면 수행
+    # Analyze requirement if not provided
     if requirement_analysis is None:
         requirement_analysis = pipeline.analyze_requirement(user_query)
 
-    # 앵커 URI가 없으면 검색
+    # Find anchor URI if not provided
     if anchor_uri is None:
         anchor_uri = pipeline.find_anchor(user_query, requirement_analysis)
 
-    if anchor_uri:
-        context = pipeline.get_context(
-            anchor_uri,
-            user_query=user_query,
-            requirement_analysis=requirement_analysis,
-        )
-        # anchor_name = anchor_uri.split("/")[-1] # REMOVED
-        return pipeline.generate_with_context(
-            user_query, requirement_analysis, anchor_uri, context, context_mode
-        )
-    else:
-        return pipeline.generate_from_analysis(
-            user_query, requirement_analysis, context_mode
-        )
+    if not anchor_uri:
+        return {
+            "error": "No valid anchor node was found in the knowledge graph.",
+            "reason": "Closed-world synthesis requires a registry-backed KG anchor.",
+            "requirement_analysis": requirement_analysis,
+        }
+
+    context = pipeline.get_context(
+        anchor_uri,
+        user_query=user_query,
+        requirement_analysis=requirement_analysis,
+    )
+
+    return pipeline.generate_with_context(
+        user_query, requirement_analysis, anchor_uri, context, context_mode
+    )

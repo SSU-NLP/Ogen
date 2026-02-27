@@ -2,6 +2,7 @@ import pyoxigraph
 from pyoxigraph import Store, NamedNode, RdfFormat
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from jsonschema import Draft7Validator
 import numpy as np
 import openai
 import json
@@ -60,14 +61,14 @@ class OgenEngine:
         self.GRAPH_USER = NamedNode("http://ogen.ai/graph/user")
         self.GRAPH_CONTEXT = NamedNode("http://ogen.ai/graph/context")
 
-        # 온톨로지 파일 경로 (패키지 내부)
+        # Ontology file path (inside package)
         current_dir = Path(__file__).parent
         ontology_path = current_dir / "ogen-core.ttl"
 
         try:
             with open(ontology_path, "rb") as f:
-                # pyoxigraph의 load는 기본적으로 기본 그래프에 로드됨
-                # Named Graph을 사용하려면 쿼리 시 FROM 절 사용
+                # pyoxigraph's load loads into the default graph by default
+                # To use Named Graphs, use FROM clause in queries
                 self.store.load(f, "text/turtle", base_iri="http://ogen.ai/ontology/")
             print("✅ Ontology Loaded from package!")
         except FileNotFoundError:
@@ -121,7 +122,7 @@ class OgenEngine:
         return config
 
     def _build_index(self):
-        """Embed all nodes in the graph (GRAPH_CORE + GRAPH_USER 통합 검색)"""
+        """Embed all nodes in the graph (unified search across GRAPH_CORE + GRAPH_USER)"""
 
         query = """
     PREFIX ex: <http://ogen.ai/ontology/>
@@ -134,7 +135,7 @@ class OgenEngine:
     }
     """
 
-        # 기존 인덱스 초기화
+        # Reset existing index
         self.nodes = []
 
         results = self.store.query(query)
@@ -164,18 +165,18 @@ class OgenEngine:
     ):
         """
         [Graph Traversal Step]
-        BFS/DFS를 사용하여 Subgraph Context를 동적으로 탐색.
-        Hardcoded된 속성(Layout_intents)을 제거하고, 지식 그래프의 모든 속성을 가져옵니다.
+        Dynamically traverse Subgraph Context using BFS/DFS.
+        Removes hardcoded properties (Layout_intents) and retrieves all properties from the knowledge graph.
 
         [Agentic Pruning]
-        user_query와 requirement_analysis가 제공되면,
-        LLM을 통해 관련 없는 자식 노드를 가지치기(Pruning)합니다.
+        When user_query and requirement_analysis are provided,
+        prunes irrelevant child nodes via LLM.
         """
         visited = set()
         queue = [(anchor_uri, 0)]  # (uri, depth)
         subgraph = {}
 
-        # Pruning Threshold: 자식이 이보다 많을 때만 LLM 개입 (토큰 절약)
+        # Pruning Threshold: LLM intervenes only when children exceed this count (saves tokens)
         pruning_threshold = 3
 
         while queue:
@@ -185,20 +186,20 @@ class OgenEngine:
                 continue
             visited.add(current_uri)
 
-            # Node 기본 정보 조회
+            # Retrieve node basic information
             node_info = self._get_node_properties(current_uri)
             subgraph[current_uri] = node_info
 
-            # 가지치기 (Pruning) & Depth Limit
+            # Pruning & Depth Limit
             if depth >= max_depth:
                 continue
 
-            # 자식 노드 탐색 (ex: hasPart 관계)
-            # 모든 자식을 가져옴
+            # Traverse child nodes (e.g., hasPart relations)
+            # Retrieve all children
             children = self._get_children(current_uri)
 
             # [Agentic Pruning Implementation]
-            # depth가 0이거나(즉, 앵커 직속 자식), 자식이 너무 많을 때 LLM 필터링 수행
+            # Perform LLM filtering when depth is 0 (i.e., direct children of anchor) or when there are too many children
             if (
                 user_query
                 and children
@@ -216,7 +217,7 @@ class OgenEngine:
                 if child_uri not in visited:
                     queue.append((child_uri, depth + 1))
 
-        # 결과 포맷팅 (List로 변환)
+        # Format results (convert to list)
         return list(subgraph.values())
 
     def _agentic_filter_children(
@@ -228,12 +229,12 @@ class OgenEngine:
     ) -> list:
         """
         [Agentic Pruning Core]
-        LLM에게 자식 노드 목록을 보여주고, 사용자 의도에 맞는 것만 선택하도록 함.
+        Shows the list of child nodes to LLM and selects only those matching user intent.
         """
         if not children_uris:
             return []
 
-        # 자식 노드들의 Label 정보를 미리 가져옴 (LLM이 URI만 보고 판단하기 어려울 수 있음)
+        # Pre-fetch label information for child nodes (LLM may struggle to judge from URIs alone)
         candidates = []
         for uri in children_uris:
             props = self._get_node_properties(uri)
@@ -290,14 +291,14 @@ class OgenEngine:
             result = json.loads(response.choices[0].message.content or "{}")
             selected = result.get("selected_uris", [])
 
-            # 입력된 URI들 중에 실제로 존재하는 것만 필터링 (건전성 검사)
+            # Filter to only URIs that actually exist in the input (sanity check)
             valid_selected = [uri for uri in selected if uri in children_uris]
 
-            # 만약 LLM이 아무것도 선택하지 않았다면? -> 너무 공격적인 가지치기일 수 있으므로,
-            # 안전하게 원래 리스트를 반환하거나(보수적), 빈 리스트를 반환(공격적).
-            # 여기서는 '필수적인게 없다'고 판단했을 수 있으므로 빈 리스트 반환이 맞지만,
-            # 혹시 모를 에러를 대비해 fallback으로 최소 1개는 남겨야 할 수도 있음.
-            # 일단은 그대로 반환.
+            # If LLM selected nothing, it could mean overly aggressive pruning.
+            # Options: return original list (conservative) or empty list (aggressive).
+            # Here we assume LLM judged nothing as essential, so empty list is valid,
+            # but as a fallback at least 1 item might be kept for safety.
+            # For now, return as-is.
             return valid_selected
 
         except Exception as e:
@@ -305,7 +306,7 @@ class OgenEngine:
             return children_uris
 
     def _get_node_properties(self, uri: str) -> dict:
-        """단일 노드의 모든 속성을 동적으로 조회 (Hardcoding 제거)"""
+        """Dynamically retrieve all properties of a single node (no hardcoding)"""
         sparql_ref = f"<{uri}>" if not uri.startswith("<") else uri
 
         query = f"""
@@ -324,10 +325,10 @@ class OgenEngine:
             p_val = binding["p"].value
             o_val = binding["o"].value
 
-            # 속성 이름 추출 (URI의 마지막 부분)
+            # Extract property name (last part of URI)
             prop_name = p_val.split("/")[-1].split("#")[-1]
 
-            # JSON 파싱 시도 (Schema나 Rules 같은 복잡한 데이터)
+            # Attempt JSON parsing (for complex data like Schema or Rules)
             try:
                 import json
 
@@ -340,7 +341,7 @@ class OgenEngine:
         return properties
 
     def _get_children(self, parent_uri: str) -> list:
-        """자식 노드(hasPart 등) URI 조회"""
+        """Retrieve child node URIs (hasPart, etc.)"""
         sparql_ref = f"<{parent_uri}>" if not parent_uri.startswith("<") else parent_uri
 
         query = f"""
@@ -355,7 +356,7 @@ class OgenEngine:
     def analyze_requirement(self, user_query: str) -> dict:
         """
         [Requirement Analysis Step]
-        사용자 요청을 분석하여 필요한 UI 컴포넌트와 기능을 파악
+        Analyze user request to identify required UI components and features
 
         Returns:
             dict: {
@@ -417,22 +418,22 @@ class OgenEngine:
     ):
         """
         [Agentic Selection Step]
-        1. Vector Search로 후보군(Candidates)을 좁힘 (Pre-filtering)
-        2. LLM이 후보군 중에서 사용자의 의도에 가장 적합한 앵커를 선택 (Reasoning)
+        1. Narrow candidates via Vector Search (Pre-filtering)
+        2. LLM selects the most suitable anchor from candidates based on user intent (Reasoning)
 
         Args:
-            user_query: 사용자 요청
-            requirement_analysis: analyze_requirement의 결과 (선택적, 있으면 더 정확한 검색)
-            top_k: 검색할 후보 개수
+            user_query: User request
+            requirement_analysis: Result of analyze_requirement (optional, enables more accurate search)
+            top_k: Number of candidates to search
         """
         if not self.nodes:
             return None
 
-        # 요청 분석 결과가 있으면 suggested_anchor를 키워드로 활용
+        # If requirement analysis result exists, use suggested_anchor as keyword
         search_query = user_query
         if requirement_analysis and requirement_analysis.get("suggested_anchor"):
             search_query = f"{user_query} {requirement_analysis['suggested_anchor']}"
-            # required_components의 키워드도 추가
+            # Also add keywords from required_components
             for comp in requirement_analysis.get("required_components", []):
                 if comp.get("keywords"):
                     search_query += " " + " ".join(comp["keywords"])
@@ -452,33 +453,33 @@ class OgenEngine:
 
         print(f"🕵️ Candidates found: {[c['label'] for c in candidates]}")
 
-        # 요청 분석 결과를 프롬프트에 포함
+        # Include requirement analysis result in prompt
         analysis_context = ""
         if requirement_analysis:
             analysis_context = f"""
-    [Requirement Analysis]
-    User Intent: {requirement_analysis.get("user_intent", "N/A")}
-    Required Components: {json.dumps(requirement_analysis.get("required_components", []), ensure_ascii=False)}
-    Suggested Anchor: {requirement_analysis.get("suggested_anchor", "N/A")}
-    """
+            [Requirement Analysis]
+            User Intent: {requirement_analysis.get("user_intent", "N/A")}
+            Required Components: {json.dumps(requirement_analysis.get("required_components", []), ensure_ascii=False)}
+            Suggested Anchor: {requirement_analysis.get("suggested_anchor", "N/A")}
+            """
 
         system_prompt = """
-    You are a semantic router for a UI Knowledge Graph.
-    Select the most appropriate 'Target Component' URI from the candidates based on the user's intent.
-    If none of the candidates are suitable, return null.
-    
-    IMPORTANT: You must return the result in pure JSON format.
-    Output Schema: {"selected_uri": "string" or null, "reason": "string"}
-    """
+            You are a semantic router for a UI Knowledge Graph.
+            Select the most appropriate 'Target Component' URI from the candidates based on the user's intent.
+            If none of the candidates are suitable, return null.
+            
+            IMPORTANT: You must return the result in pure JSON format.
+            Output Schema: {"selected_uri": "string" or null, "reason": "string"}
+            """
 
         user_prompt = f"""
-    User Query: "{user_query}"
-    {analysis_context}
-    Candidates:
-    {json.dumps(candidates, ensure_ascii=False, indent=2)}
-    
-    Select the best anchor node and return JSON.
-    """
+            User Query: "{user_query}"
+            {analysis_context}
+            Candidates:
+            {json.dumps(candidates, ensure_ascii=False, indent=2)}
+            
+            Select the best anchor node and return JSON.
+            """
 
         response = self.client.chat.completions.create(
             model=self.model_config.get("anchor", "gpt-5"),
@@ -499,51 +500,33 @@ class OgenEngine:
     def reason(self, user_query: str, context_mode: str = "default"):
         """
         LLM Reasoning Stage:
-        1. Analyze User Requirement (요청 분석)
-        2. Find Anchor Node based on Analysis (KG 기반 추론)
+        1. Analyze User Requirement
+        2. Find Anchor Node based on Analysis (KG-based reasoning)
         3. Retrieve Graph Context (Facts)
         4. Construct Prompt (Instruction + Facts + Analysis)
         5. Generate Output (LLM Inference)
         """
 
-        # Step 1: 요청 분석
         print(f"🔍 Step 1: Analyzing requirement for query: '{user_query}'")
         requirement_analysis = self.analyze_requirement(user_query)
 
-        # Step 2: 요청 분석 결과를 바탕으로 앵커 노드 찾기
+
         print(f"🔍 Step 2: Finding anchor node based on analysis")
         anchor_uri = self.find_anchor_node_with_llm(user_query, requirement_analysis)
 
         if not anchor_uri:
-            # 앵커를 찾지 못했지만, 요청 분석 결과가 있으면 그것을 바탕으로 UI 생성 시도
-            if requirement_analysis and requirement_analysis.get("suggested_anchor"):
-                suggested = requirement_analysis["suggested_anchor"]
-                print(f"⚠️ Anchor not found, but trying with suggested: {suggested}")
-                # suggested_anchor를 URI 형식으로 변환 시도
-                # 사용자 데이터에서 찾기
-                for node in self.nodes:
-                    if (
-                        suggested.lower() in node["label"].lower()
-                        or node["label"].lower() in suggested.lower()
-                    ):
-                        anchor_uri = node["uri"]
-                        print(
-                            f"✅ Found matching node: {node['label']} -> {anchor_uri}"
-                        )
-                        break
+            suggested_anchor = None
+            if requirement_analysis:
+                suggested_anchor = requirement_analysis.get("suggested_anchor")
 
-                if not anchor_uri:
-                    # 여전히 찾지 못하면 요청 분석 결과만으로 UI 생성
-                    return self._generate_ui_from_analysis(
-                        user_query, requirement_analysis, context_mode
-                    )
-            else:
-                return {
-                    "error": "요청하신 UI 컴포넌트를 지식 그래프에서 찾을 수 없습니다."
-                }
+            return {
+                "error": "No valid anchor node was found in the knowledge graph.",
+                "reason": "Closed-world synthesis requires a registry-backed KG anchor.",
+                "user_query": user_query,
+                "suggested_anchor": suggested_anchor,
+                "requirement_analysis": requirement_analysis,
+            }
 
-        # Step 3: Graph Context 검색 (Dynamic Traversal)
-        # Note: Removing the split logic as requested. Metadata is typically enough, or we use full URI.
         print(f"📚 Step 3: Retrieving graph context for anchor: {anchor_uri}")
         retrieved_children = self.get_subgraph_context(
             anchor_uri,
@@ -551,85 +534,23 @@ class OgenEngine:
             requirement_analysis=requirement_analysis,
         )
 
-        # Step 4 & 5: UI 생성
+        if not retrieved_children:
+            return {
+                "error": "No usable subgraph context was retrieved from the knowledge graph.",
+                "reason": "Closed-world synthesis requires KG-backed component context.",
+                "source_anchor": anchor_uri,
+                "user_query": user_query,
+                "requirement_analysis": requirement_analysis,
+            }
+
+        # Step 4 & 5: Generate UI with retrieved KG context only
         return self._generate_ui_with_context(
             user_query,
             requirement_analysis,
-            anchor_uri,  # Pass full URI instead of split name
+            anchor_uri,
             retrieved_children,
             context_mode,
         )
-
-    def _generate_ui_from_analysis(
-        self, user_query: str, requirement_analysis: dict, context_mode: str
-    ) -> dict:
-        """
-        요청 분석 결과만으로 UI 생성 (KG에서 컴포넌트를 찾지 못한 경우)
-        """
-        constraints = []
-        if context_mode == "low-vision":
-            constraints = ["High Contrast Theme", "Base Font Size 24px"]
-
-        allowed_component_ids = []
-        for node in self.nodes:
-            uri = node.get("uri")
-            if isinstance(uri, str) and uri.startswith("http://myapp.com/ui/"):
-                allowed_component_ids.append(uri.split("/")[-1])
-
-        system_prompt = f"""
-    You are an expert UI Compiler. Your job is to generate a JSON specification for a UI component based on the user's request and requirement analysis.
-    
-    [RULES]
-    0. The JSON field "type" MUST be a component id, not a label. Use ONLY ids from AllowedComponentIds.
-    1. Generate appropriate UI components based on the requirement analysis.
-    2. Apply the 'Constraints' to the properties of the components.
-    3. Use standard HTML form elements and components (input, button, form, etc.).
-    4. Apply validation rules when generating input components.
-    5. Use proper layout (flex, column direction, spacing).
-    6. Include accessibility attributes (ariaLabel, role).
-    7. Set appropriate defaultState, variant, and other style properties.
-    8. Output must be valid JSON with the following structure:
-       {{
-         "type": "component_name",
-         "props": {{ ... }},
-         "children": [ ... ]
-       }}
-    """
-
-        user_prompt = f"""
-    User Query: "{user_query}"
-    
-    [Requirement Analysis]
-    User Intent: {requirement_analysis.get("user_intent", "N/A")}
-    Required Components: {json.dumps(requirement_analysis.get("required_components", []), ensure_ascii=False, indent=2)}
-    Required Features: {json.dumps(requirement_analysis.get("required_features", []), ensure_ascii=False)}
-
-    [AllowedComponentIds]
-    {json.dumps(allowed_component_ids, ensure_ascii=False)}
-    
-    [Constraints]
-    - {", ".join(constraints) if constraints else "None"}
-    
-    Generate the UI JSON spec now. Create a complete and accessible component specification based on the requirement analysis.
-    """
-
-        response = self.client.chat.completions.create(
-            model=self.model_config.get("generation", "gpt-5"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
-
-        llm_output = json.loads(response.choices[0].message.content or "{}")
-
-        return {
-            "source_anchor": requirement_analysis.get("suggested_anchor", "generated"),
-            "reasoning_mode": context_mode,
-            "generated_spec": llm_output,
-            "requirement_analysis": requirement_analysis,
-        }
 
     def _generate_ui_with_context(
         self,
@@ -640,7 +561,7 @@ class OgenEngine:
         context_mode: str,
     ) -> dict:
         """
-        Graph Context를 활용하여 UI 생성
+        Generate UI using Graph Context with iterative validation.
         """
         constraints = []
         if context_mode == "low-vision":
@@ -651,94 +572,146 @@ class OgenEngine:
             for c in retrieved_children
             if isinstance(c, dict)
         ]
+        allowed_component_ids = [cid for cid in allowed_component_ids if cid]
 
-        # Anchor may be a URI; normalize to an id-like token.
+        if not allowed_component_ids:
+            return {
+                "error": "No allowed component IDs were found in the retrieved graph context.",
+                "reason": "Closed-world synthesis requires non-empty KG-backed component candidates.",
+                "source_anchor": anchor_name,
+                "requirement_analysis": requirement_analysis,
+            }
+
+        allowed_component_ids_set = set(allowed_component_ids)
+        schema_map = self._build_component_schema_map(retrieved_children)
+
         anchor_id = str(anchor_name).split("#")[-1].split("/")[-1]
 
         system_prompt = f"""
-    You are an expert UI Compiler powered by a Knowledge Graph.
-    Your job is to generate a JSON specification for a UI component based on the user's request.
-    
-    [RULES]
-    0. The JSON field "type" MUST be a component id, not a label. Use ONLY ids from AllowedComponentIds.
-    1. STRICTLY use only the components provided in the 'Graph Context'. Do not hallucinate new components.
-    2. Apply the 'Constraints' to the properties of the components.
-    3. Use the propSchema information to set appropriate default values and types.
-    4. Apply validationRules when generating input components.
-    5. Use layoutType, flexDirection, and spacing for proper layout.
-    6. Include accessibility attributes (ariaLabel, role) when available.
-    7. Set appropriate defaultState, variant, and other style properties.
-    8. Consider the requirement analysis to ensure the generated UI matches user intent.
-    9. Output must be valid JSON with the following structure:
-       {{
-         "type": "component_name",
-         "props": {{ ... }},
-         "children": [ ... ]
-       }}
-    """
+            You are an expert UI Compiler powered by a Knowledge Graph.
+            Your job is to generate a JSON specification for a UI component based on the user's request.
+
+            [RULES]
+            0. The JSON field "type" MUST be a component id, not a label. Use ONLY ids from AllowedComponentIds.
+            1. STRICTLY use only the components provided in the 'Graph Context'. Do not hallucinate new components.
+            2. Apply the 'Constraints' to the properties of the components.
+            3. Use the propSchema information to set appropriate default values and types.
+            4. Apply validationRules when generating input components.
+            5. Use layoutType, flexDirection, and spacing for proper layout.
+            6. Include accessibility attributes (ariaLabel, role) when available.
+            7. Set appropriate defaultState, variant, and other style properties.
+            8. Consider the requirement analysis to ensure the generated UI matches user intent.
+            9. Output must be valid JSON with the following structure:
+            {{
+                "type": "component_name",
+                "props": {{ ... }},
+                "children": [ ... ]
+            }}
+            """
 
         analysis_summary = ""
         if requirement_analysis:
             analysis_summary = f"""
-    [Requirement Analysis]
-    User Intent: {requirement_analysis.get("user_intent", "N/A")}
-    Required Features: {json.dumps(requirement_analysis.get("required_features", []), ensure_ascii=False)}
+            [Requirement Analysis]
+            User Intent: {requirement_analysis.get("user_intent", "N/A")}
+            Required Features: {json.dumps(requirement_analysis.get("required_features", []), ensure_ascii=False)}
+            """
+
+        base_user_prompt = f"""
+            User Query: "{user_query}"
+            {analysis_summary}
+            [Graph Context (Facts)]
+            - Target Component URI: {anchor_name}
+            - Target Component Id: {anchor_id}
+            - AllowedComponentIds: {json.dumps(allowed_component_ids, ensure_ascii=False)}
+            - Available Parts (Sub-components with full metadata): {json.dumps(retrieved_children, ensure_ascii=False, indent=2)}
+
+            [Component Information]
+            Each part includes:
+            - type: Component type name
+            - label: Human-readable label
+            - propType: HTML element type (if applicable)
+            - propSchema: Available properties with types, defaults, and descriptions
+            - validationRules: Input validation rules (pattern, minLength, etc.)
+            - layoutType: Layout system (flex, grid, etc.)
+            - flexDirection: Flex direction (row, column)
+            - spacing: Spacing between children
+            - ariaLabel: Accessibility label
+            - role: ARIA role
+            - defaultState: Default component state
+            - variant: Style variant
+
+            [Constraints]
+            - {", ".join(constraints) if constraints else "None"}
+
+            Generate the UI JSON spec now. Use all available metadata and requirement analysis to create a complete and accessible component specification that matches the user's intent.
+            """
+
+        max_attempts = 3
+        repair_feedback = ""
+        last_errors = []
+        llm_output = {}
+
+        for attempt in range(1, max_attempts + 1):
+            user_prompt = base_user_prompt
+
+            if repair_feedback:
+                user_prompt += f"""
+
+    [Validation Errors from Previous Attempt]
+    {repair_feedback}
+
+    Revise the entire JSON output so that it satisfies all listed constraints and schema requirements.
     """
 
-        user_prompt = f"""
-    User Query: "{user_query}"
-    {analysis_summary}
-    [Graph Context (Facts)]
-    - Target Component URI: {anchor_name}
-    - Target Component Id: {anchor_id}
-    - AllowedComponentIds: {json.dumps(allowed_component_ids, ensure_ascii=False)}
-    - Available Parts (Sub-components with full metadata): {json.dumps(retrieved_children, ensure_ascii=False, indent=2)}
-    
-    [Component Information]
-    Each part includes:
-    - type: Component type name
-    - label: Human-readable label
-    - propType: HTML element type (if applicable)
-    - propSchema: Available properties with types, defaults, and descriptions
-    - validationRules: Input validation rules (pattern, minLength, etc.)
-    - layoutType: Layout system (flex, grid, etc.)
-    - flexDirection: Flex direction (row, column)
-    - spacing: Spacing between children
-    - ariaLabel: Accessibility label
-    - role: ARIA role
-    - defaultState: Default component state
-    - variant: Style variant
-    
-    [Constraints]
-    - {", ".join(constraints) if constraints else "None"}
-    
-    Generate the UI JSON spec now. Use all available metadata and requirement analysis to create a complete and accessible component specification that matches the user's intent.
-    """
+            response = self.client.chat.completions.create(
+                model=self.model_config.get("generation", "gpt-5"),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
 
-        response = self.client.chat.completions.create(
-            model=self.model_config.get("generation", "gpt-5"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
+            llm_output = json.loads(response.choices[0].message.content or "{}")
 
-        llm_output = json.loads(response.choices[0].message.content or "{}")
+            validation_errors = self._validate_ui_tree(
+                llm_output,
+                allowed_component_ids_set,
+                schema_map,
+            )
+
+            if not validation_errors:
+                return {
+                    "source_anchor": anchor_name,
+                    "reasoning_mode": context_mode,
+                    "generated_spec": llm_output,
+                    "requirement_analysis": requirement_analysis,
+                    "validated": True,
+                    "validation_attempts": attempt,
+                }
+
+            last_errors = validation_errors
+            repair_feedback = "\n".join(f"- {e}" for e in validation_errors[:20])
 
         return {
+            "error": "Failed to generate a valid UI specification within retry limit.",
+            "reason": "Iterative validation failed after 3 attempts.",
             "source_anchor": anchor_name,
             "reasoning_mode": context_mode,
             "generated_spec": llm_output,
             "requirement_analysis": requirement_analysis,
+            "validated": False,
+            "validation_attempts": max_attempts,
+            "validation_errors": last_errors,
         }
 
     def is_user_data_loaded(self) -> bool:
-        """사용자 데이터가 로드되어 있는지 확인"""
+        """Check if user data is loaded"""
         if self.user_data_loaded:
             return True
 
-        # SPARQL 쿼리로 GRAPH_USER에 데이터가 있는지 확인
+        # Check if GRAPH_USER has data via SPARQL query
         query = """
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
     
@@ -749,32 +722,32 @@ class OgenEngine:
     """
 
         results = self.store.query(query)
-        # 온톨로지 노드 개수와 비교하여 사용자 데이터가 있는지 확인
-        # 간단하게는 플래그로 관리
+        # Compare with ontology node count to check if user data exists
+        # Managed simply via flag
         return self.user_data_loaded
 
     def load_user_data_from_string(
         self, ttl_string: str, base_iri: str = "http://myapp.com/ui/"
     ) -> dict:
-        """API로 받은 문자열 데이터를 User Graph에 적재"""
+        """Load string data received via API into User Graph"""
         try:
-            # 기존 사용자 데이터 삭제 (재연결 시 중복 방지)
-            # pyoxigraph에서는 그래프를 직접 삭제할 수 없으므로
-            # 모든 트리플을 쿼리해서 삭제하거나, 새 Store를 만들거나
-            # 여기서는 간단하게 기존 데이터를 무시하고 새로 로드
-            # (실제로는 사용자 데이터만 쿼리해서 삭제하는 것이 좋지만,
-            #  현재는 전체 인덱스를 재빌드하는 방식으로 처리)
+            # Delete existing user data (prevent duplication on reconnect)
+            # pyoxigraph cannot directly delete a graph,
+            # so either query and delete all triples, or create a new Store.
+            # Here we simply ignore existing data and reload.
+            # (Ideally, only user data should be queried and deleted,
+            #  but currently handled by rebuilding the entire index)
 
-            # TTL 문자열을 바이트로 변환
+            # Convert TTL string to bytes
             ttl_bytes = ttl_string.encode("utf-8")
 
-            # 사용자 데이터 로드 (기본 그래프에 로드, 나중에 쿼리로 구분)
+            # Load user data (into default graph, distinguished later by query)
             self.store.load(ttl_bytes, "text/turtle", base_iri=base_iri)
 
-            # 플래그 설정
+            # Set flag
             self.user_data_loaded = True
 
-            # 인덱스 재빌드 (새로운 데이터 검색 가능하게)
+            # Rebuild index (enable searching new data)
             self._build_index()
 
             node_count = len(self.nodes)
@@ -793,7 +766,7 @@ class OgenEngine:
         force: bool = False,
     ) -> dict:
         """
-        초기 연동을 위한 통합 API 함수
+        Unified API function for initial connection
 
         Returns:
             dict: {
@@ -821,7 +794,7 @@ class OgenEngine:
         else:
             result = self.load_user_data_from_string(ttl_string, base_iri)
 
-        # 그래프를 디스크에 저장 (다음 시작 시 복원용)
+        # Persist graph to disk (for restoration on next startup)
         self._persist_graph()
 
         return {
@@ -831,7 +804,7 @@ class OgenEngine:
         }
 
     def _persist_graph(self):
-        """현재 그래프 상태를 디스크에 저장"""
+        """Persist current graph state to disk"""
         try:
             graph_file = self.persistence_dir / "user_graph.trig"
             tmp_file = self.persistence_dir / "user_graph.trig.tmp"
@@ -889,3 +862,76 @@ class OgenEngine:
             self.store = old_store
             self.user_data_loaded = old_loaded
             raise
+    
+    def _build_component_schema_map(self, retrieved_children: list) -> dict:
+        schema_map = {}
+        for c in retrieved_children:
+            if not isinstance(c, dict):
+                continue
+
+            cid = c.get("id") or c.get("type") or c.get("label")
+            prop_schema = c.get("propSchema")
+
+            if cid and isinstance(prop_schema, dict):
+                schema_map[cid] = prop_schema
+
+        return schema_map
+
+
+    def _validate_ui_tree(
+        self,
+        node: dict,
+        allowed_component_ids: set[str],
+        schema_map: dict,
+        path: str = "root",
+    ) -> list[str]:
+        errors = []
+
+        if not isinstance(node, dict):
+            return [f"{path}: node must be an object"]
+
+        node_type = node.get("type")
+        props = node.get("props")
+        children = node.get("children", [])
+
+        # Basic structural checks
+        if not isinstance(node_type, str):
+            errors.append(f"{path}: 'type' must be a string")
+            return errors
+
+        if node_type not in allowed_component_ids:
+            errors.append(
+                f"{path}: component '{node_type}' is not included in AllowedComponentIds"
+            )
+
+        if props is None:
+            errors.append(f"{path}: missing 'props'")
+        elif not isinstance(props, dict):
+            errors.append(f"{path}: 'props' must be an object")
+
+        if children is None:
+            children = []
+        elif not isinstance(children, list):
+            errors.append(f"{path}: 'children' must be a list")
+            children = []
+
+        # Per-component propSchema validation
+        if isinstance(props, dict) and node_type in schema_map:
+            schema = schema_map[node_type]
+            validator = Draft7Validator(schema)
+            for err in validator.iter_errors(props):
+                loc = ".".join(str(x) for x in err.path) if err.path else "props"
+                errors.append(f"{path}: schema violation at {loc}: {err.message}")
+
+        # Recursive validation
+        for i, child in enumerate(children):
+            errors.extend(
+                self._validate_ui_tree(
+                    child,
+                    allowed_component_ids,
+                    schema_map,
+                    path=f"{path}.children[{i}]",
+                )
+            )
+
+        return errors
