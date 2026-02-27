@@ -133,6 +133,100 @@ cd apps/server && uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 cd apps/front && pnpm dev
 ```
 
+## Adding UI Components
+
+New components must be registered in **two files** so the KG engine can discover and reason about them:
+
+| File | Role |
+|------|------|
+| `apps/front/src/lib/ds.ts` | **Runtime registry** — maps component names to Svelte imports for the UI renderer |
+| `apps/front/src/lib/design-studio.metadata.json` | **Metadata store** — category, keywords, `hasPart`, `propSchema`, etc. used for TTL/KG generation |
+
+### Manual Registration (Code)
+
+#### 1. Create the Svelte component
+
+```bash
+# apps/front/src/lib/components/MyWidget.svelte
+```
+
+#### 2. Register in `ds.ts`
+
+```ts
+// apps/front/src/lib/ds.ts
+
+// ① Import
+import MyWidget from './components/MyWidget.svelte';
+
+// ② Add to designSystem (runtime mapping)
+export const designSystem: Record<string, any> = {
+  // ... existing entries
+  MyWidget,
+};
+
+// ③ Add to designSystemMetadata (KG metadata)
+export const designSystemMetadata: Record<string, ComponentMetadata> = {
+  // ... existing entries
+  MyWidget: {
+    type: 'MyWidget',
+    label: 'My Widget',
+    comment: 'Short description of what it does.',
+    keywords: ['widget', 'example'],
+    category: 'Molecule',          // Atom | Molecule | Organism | Template
+    hasPart: ['Button', 'Text'],   // optional — child components
+    propSchema: {
+      title: { type: 'string', default: 'Hello', description: 'Widget title' }
+    }
+  }
+};
+```
+
+#### 3. Add metadata to `design-studio.metadata.json`
+
+Add the same metadata object (JSON format) under the component key. This file is the **authoritative source** for TTL generation:
+
+```jsonc
+// apps/front/src/lib/design-studio.metadata.json
+{
+  // ... existing entries
+  "MyWidget": {
+    "type": "MyWidget",
+    "label": "My Widget",
+    "comment": "Short description of what it does.",
+    "keywords": ["widget", "example"],
+    "category": "Molecule",
+    "hasPart": ["Button", "Text"],
+    "propSchema": {
+      "title": { "type": "string", "default": "Hello", "description": "Widget title" }
+    }
+  }
+}
+```
+
+> **Why both files?**  
+> `ds.ts` is used at runtime to resolve component names to actual Svelte imports.  
+> `design-studio.metadata.json` is the serialised metadata read by the Design Studio UI and the TTL generator. They must stay in sync.
+
+---
+
+### Visual Registration (Design Studio)
+
+The **Design Studio** UI (`/design-studio`) provides a no-code workflow:
+
+```
+ Scan Components  →  Edit Metadata  →  Generate TTL  →  Sync to Backend
+```
+
+1. **Scan** — The scanner (`@ogen/design-studio/scanner`) reads `.svelte` files and auto-extracts props.
+2. **Edit** — The studio UI lets you set `category`, `keywords`, `hasPart`, accessibility fields, etc.
+3. **Save Metadata** — Clicking **Save** persists the edited metadata to `design-studio.metadata.json` via `POST /api/design-studio/metadata` (dev mode only).
+4. **Generate TTL** — The generator (`@ogen/design-studio/generator`) converts the metadata into RDF/Turtle triples.
+5. **Sync** — The generated TTL is sent to the backend, which loads it into the Knowledge Graph for KG-grounded reasoning.
+
+> Even when using Design Studio, you still need to manually add the `import` and registry entry in `ds.ts` for the UI renderer to resolve the component at runtime.
+
+---
+
 ## Citation
 
 ```bibtex
