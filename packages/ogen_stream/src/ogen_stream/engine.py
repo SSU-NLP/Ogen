@@ -61,20 +61,6 @@ class OgenEngine:
         self.GRAPH_USER = NamedNode("http://ogen.ai/graph/user")
         self.GRAPH_CONTEXT = NamedNode("http://ogen.ai/graph/context")
 
-        # Ontology file path (inside package)
-        current_dir = Path(__file__).parent
-        ontology_path = current_dir / "ogen-core.ttl"
-
-        try:
-            with open(ontology_path, "rb") as f:
-                # pyoxigraph's load loads into the default graph by default
-                # To use Named Graphs, use FROM clause in queries
-                self.store.load(f, "text/turtle", base_iri="http://ogen.ai/ontology/")
-            print("✅ Ontology Loaded from package!")
-        except FileNotFoundError:
-            print(f"❌ Error: {ontology_path} not found")
-            raise
-
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
         self.nodes = []
         self.node_embeddings = []
@@ -97,8 +83,8 @@ class OgenEngine:
         defaults = {
             "analysis": "gpt-5",
             "anchor": "gpt-4o-mini",
-            "generation": "gpt-5",
-            "pruning": "gpt-5-mini",
+            "generation": "gpt-5-mini",
+            "pruning": "gpt-5",
         }
 
         config: dict[str, str] = {**defaults}
@@ -122,39 +108,108 @@ class OgenEngine:
         return config
 
     def _build_index(self):
-        """Embed all nodes in the graph (unified search across GRAPH_CORE + GRAPH_USER)"""
+        """Embed all nodes in the graph (unified search across GRAPH_CORE + GRAPH_USER).
+        Also fetches rdf:type (category) and hasPart child count for hierarchy-aware ranking.
+        """
 
-        query = """
+        # Query 1: Get all nodes with their metadata and type
+        query_nodes = """
     PREFIX ex: <http://ogen.ai/ontology/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-    SELECT ?s ?label ?comment ?keywords WHERE {
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+    SELECT ?s ?label ?comment ?keywords ?type WHERE {
       ?s rdfs:label ?label .
       OPTIONAL { ?s rdfs:comment ?comment }
       OPTIONAL { ?s ex:keywords ?keywords }
+      OPTIONAL { ?s rdf:type ?type }
     }
+    """
+
+        # Query 2: Get hasPart child counts
+        query_children = """
+    PREFIX ex: <http://ogen.ai/ontology/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    SELECT ?parent (COUNT(?child) AS ?childCount) WHERE {
+      ?parent rdfs:label ?label .
+      ?parent ex:hasPart ?child .
+    } GROUP BY ?parent
     """
 
         # Reset existing index
         self.nodes = []
 
-        results = self.store.query(query)
+        # Build child count map
+        child_counts: dict[str, int] = {}
+        try:
+            for binding in self.store.query(query_children):
+                uri = binding["parent"].value
+                try:
+                    child_counts[uri] = int(binding["childCount"].value)
+                except (ValueError, AttributeError):
+                    pass
+        except Exception as e:
+            print(f"⚠️ Child count query failed, continuing without: {e}")
 
-        for binding in results:
+        # Build node list (deduplicate by URI, prefer Atomic Design category)
+        ATOMIC_CATEGORIES = {"Atom", "Molecule", "Organism", "Template"}
+        seen: dict[str, dict] = {}  # uri -> node dict
+
+        for binding in self.store.query(query_nodes):
             uri = binding["s"].value
             label = binding["label"].value
-            search_text = f"{label}"
-            if "keywords" in binding:
-                search_text += f" {binding['keywords'].value}"
-            if "comment" in binding:
-                search_text += f" {binding['comment'].value}"
 
-            self.nodes.append({"uri": uri, "label": label, "search_text": search_text})
+            # Extract Atomic Design category from rdf:type
+            category = "unknown"
+            try:
+                type_term = binding["type"]
+                if type_term is not None:
+                    type_uri = type_term.value
+                    type_name = type_uri.split("/")[-1].split("#")[-1]
+                    if type_name in ATOMIC_CATEGORIES:
+                        category = type_name
+            except (KeyError, AttributeError):
+                pass
+
+            # Deduplicate: if already seen, upgrade category if current is better
+            if uri in seen:
+                if category != "unknown" and seen[uri]["category"] == "unknown":
+                    seen[uri]["category"] = category
+                continue
+
+            search_text = f"{label}"
+            try:
+                kw = binding["keywords"]
+                if kw is not None:
+                    search_text += f" {kw.value}"
+            except (KeyError, AttributeError):
+                pass
+            try:
+                cm = binding["comment"]
+                if cm is not None:
+                    search_text += f" {cm.value}"
+            except (KeyError, AttributeError):
+                pass
+
+            node = {
+                "uri": uri,
+                "label": label,
+                "search_text": search_text,
+                "category": category,
+                "child_count": child_counts.get(uri, 0),
+            }
+            seen[uri] = node
+
+        self.nodes = list(seen.values())
 
         if self.nodes:
             labels = [n["label"] for n in self.nodes]
             self.node_embeddings = self.embedder.encode(labels)
-            print(f"📊 Index rebuilt: {len(self.nodes)} nodes")
+            cats = {}
+            for n in self.nodes:
+                cats[n["category"]] = cats.get(n["category"], 0) + 1
+            print(f"📊 Index rebuilt: {len(self.nodes)} nodes ({cats})")
 
     def get_subgraph_context(
         self,
@@ -280,7 +335,7 @@ class OgenEngine:
 
         try:
             response = self.client.chat.completions.create(
-                model=self.model_config.get("pruning", "gpt-4o-mini"),
+                model=self.model_config.get("pruning"),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -355,50 +410,67 @@ class OgenEngine:
 
     def analyze_requirement(self, user_query: str) -> dict:
         """
-        [Requirement Analysis Step]
-        Analyze user request to identify required UI components and features
+        [Requirement Analysis Step — KAPING]
+        Analyze user request with Knowledge Graph component list injected
+        into the prompt so the LLM is grounded in the actual KG.
 
         Returns:
             dict: {
                 "required_components": [{"type": str, "purpose": str, "keywords": [str]}],
                 "user_intent": str,
-                "suggested_anchor": str or None,
+                "suggested_anchors": [str],
+                "anchor_description": str,
                 "required_features": [str]
             }
         """
 
-        system_prompt = """
+        # KAPING: collect component labels from the KG index
+        available_components = sorted({n["label"] for n in self.nodes}) if self.nodes else []
+
+        system_prompt = f"""
     You are a UI requirement analyzer. Your job is to analyze user requests and determine what UI components and features are needed.
-    
+
+    [Available Components in Knowledge Graph]
+    {json.dumps(available_components, ensure_ascii=False)}
+
     Analyze the user's request and extract:
     1. What UI components are needed (e.g., login form, search bar, button)
     2. The user's intent (what they want to accomplish)
-    3. Suggested component names that might match the Knowledge Graph
-    4. Required features (validation, accessibility, etc.)
-    
-    IMPORTANT: You must return the result in pure JSON format.
-    Output Schema: {
-        "required_components": [{"type": "string", "purpose": "string", "keywords": ["string"]}],
+    3. Suggested anchor components — you MUST select ONLY from the Available Components list above.
+       Pick 1-3 components that best match the user's request as the root (anchor) component.
+    4. A semantic anchor description — a short natural language description of the ideal anchor component
+       for retrieval purposes (e.g., "A form container for user authentication with email and password fields").
+    5. Required features (validation, accessibility, etc.)
+
+    IMPORTANT:
+    - suggested_anchors MUST contain names from the Available Components list. Do NOT invent new names.
+    - anchor_description should be a semantic description, NOT a component name.
+    - You must return the result in pure JSON format.
+
+    Output Schema: {{
+        "required_components": [{{"type": "string", "purpose": "string", "keywords": ["string"]}}],
         "user_intent": "string",
-        "suggested_anchor": "string or null",
+        "suggested_anchors": ["string"],
+        "anchor_description": "string",
         "required_features": ["string"]
-    }
+    }}
     """
 
         user_prompt = f"""
     User Query: "{user_query}"
-    
+
     Analyze this request and determine:
     1. What UI components are needed to fulfill this request
     2. The user's intent
-    3. A suggested component name that might exist in the Knowledge Graph (e.g., "LoginCard", "SearchBar")
-    4. Required features (e.g., "email validation", "password strength", "accessibility")
-    
+    3. Suggested anchor components (MUST be from the Available Components list)
+    4. A semantic anchor description for vector retrieval
+    5. Required features (e.g., "email validation", "password strength", "accessibility")
+
     Return the analysis in JSON format.
     """
 
         response = self.client.chat.completions.create(
-            model=self.model_config.get("analysis", "gpt-5"),
+            model=self.model_config.get("analysis"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -414,25 +486,30 @@ class OgenEngine:
         return analysis
 
     def find_anchor_node_with_llm(
-        self, user_query: str, requirement_analysis: dict | None = None, top_k: int = 5
+        self, user_query: str, requirement_analysis: dict | None = None, top_k: int = 10
     ):
         """
-        [Agentic Selection Step]
+        [Agentic Selection Step with Hierarchy Re-ranking]
         1. Narrow candidates via Vector Search (Pre-filtering)
-        2. LLM selects the most suitable anchor from candidates based on user intent (Reasoning)
+        2. Re-rank candidates with hierarchy boost (Template > Organism > Molecule > Atom)
+        3. LLM selects the most suitable anchor from top candidates (Reasoning)
 
         Args:
             user_query: User request
             requirement_analysis: Result of analyze_requirement (optional, enables more accurate search)
-            top_k: Number of candidates to search
+            top_k: Number of candidates for initial vector search (re-ranked to top 5 for LLM)
         """
         if not self.nodes:
             return None
 
-        # If requirement analysis result exists, use suggested_anchor as keyword
+        # HyDE: use anchor_description (semantic) for vector search
         search_query = user_query
-        if requirement_analysis and requirement_analysis.get("suggested_anchor"):
-            search_query = f"{user_query} {requirement_analysis['suggested_anchor']}"
+        if requirement_analysis:
+            if requirement_analysis.get("anchor_description"):
+                search_query = f"{user_query} {requirement_analysis['anchor_description']}"
+            # Append suggested anchor names (grounded in KG via KAPING)
+            for anchor in requirement_analysis.get("suggested_anchors", []):
+                search_query += f" {anchor}"
             # Also add keywords from required_components
             for comp in requirement_analysis.get("required_components", []):
                 if comp.get("keywords"):
@@ -443,15 +520,36 @@ class OgenEngine:
 
         top_k_indices = np.argsort(similarities)[::-1][:top_k]
 
+        # Hierarchy boost weights (Atomic Design level)
+        HIERARCHY_WEIGHT = {
+            "Template": 4,
+            "Organism": 3,
+            "Molecule": 2,
+            "Atom": 1,
+            "unknown": 2,
+        }
+
         candidates = []
         for idx in top_k_indices:
             node = self.nodes[idx]
-            score = similarities[idx]
-            candidates.append(
-                {"uri": node["uri"], "label": node["label"], "score": float(score)}
-            )
+            sim_score = float(similarities[idx])
+            hierarchy_boost = HIERARCHY_WEIGHT.get(node.get("category", "unknown"), 2) * 0.05
+            reranked_score = sim_score + hierarchy_boost
 
-        print(f"🕵️ Candidates found: {[c['label'] for c in candidates]}")
+            candidates.append({
+                "uri": node["uri"],
+                "label": node["label"],
+                "category": node.get("category", "unknown"),
+                "child_count": node.get("child_count", 0),
+                "similarity": sim_score,
+                "reranked_score": round(reranked_score, 4),
+            })
+
+        # Sort by reranked score and take top 5 for LLM
+        candidates.sort(key=lambda c: c["reranked_score"], reverse=True)
+        candidates = candidates[:5]
+
+        print(f"🕵️ Candidates (re-ranked): {[(c['label'], c['category'], c['reranked_score']) for c in candidates]}")
 
         # Include requirement analysis result in prompt
         analysis_context = ""
@@ -460,15 +558,24 @@ class OgenEngine:
             [Requirement Analysis]
             User Intent: {requirement_analysis.get("user_intent", "N/A")}
             Required Components: {json.dumps(requirement_analysis.get("required_components", []), ensure_ascii=False)}
-            Suggested Anchor: {requirement_analysis.get("suggested_anchor", "N/A")}
+            Suggested Anchors: {json.dumps(requirement_analysis.get("suggested_anchors", []), ensure_ascii=False)}
+            Anchor Description: {requirement_analysis.get("anchor_description", "N/A")}
             """
 
         system_prompt = """
             You are a semantic router for a UI Knowledge Graph.
             Select the most appropriate 'Target Component' URI from the candidates based on the user's intent.
-            If none of the candidates are suitable, return null.
-            
-            IMPORTANT: You must return the result in pure JSON format.
+
+            SELECTION GUIDELINES:
+            - If category and child_count are available, prefer higher hierarchy levels
+              (Template > Organism > Molecule > Atom) and components with children (child_count > 0).
+            - If hierarchy info is unavailable (all categories "unknown"), select based on
+              semantic relevance to the user query — choose the component that best serves
+              as the root container for the requested UI.
+            - Only select an Atom if the user explicitly asks for a single element (e.g., "show me a button").
+            - If none of the candidates are suitable at all, return null.
+
+            You must return the result in pure JSON format.
             Output Schema: {"selected_uri": "string" or null, "reason": "string"}
             """
 
@@ -477,12 +584,12 @@ class OgenEngine:
             {analysis_context}
             Candidates:
             {json.dumps(candidates, ensure_ascii=False, indent=2)}
-            
+
             Select the best anchor node and return JSON.
             """
 
         response = self.client.chat.completions.create(
-            model=self.model_config.get("anchor", "gpt-5"),
+            model=self.model_config.get("anchor"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -494,10 +601,9 @@ class OgenEngine:
 
         selected_uri = decision.get("selected_uri")
         print(f"🎯 LLM Selected: {selected_uri} (Reason: {decision.get('reason')})")
-
         return selected_uri
 
-    def reason(self, user_query: str, context_mode: str = "default"):
+    def reason(self, user_query: str):
         """
         LLM Reasoning Stage:
         1. Analyze User Requirement
@@ -515,15 +621,15 @@ class OgenEngine:
         anchor_uri = self.find_anchor_node_with_llm(user_query, requirement_analysis)
 
         if not anchor_uri:
-            suggested_anchor = None
+            suggested_anchors = []
             if requirement_analysis:
-                suggested_anchor = requirement_analysis.get("suggested_anchor")
+                suggested_anchors = requirement_analysis.get("suggested_anchors", [])
 
             return {
                 "error": "No valid anchor node was found in the knowledge graph.",
                 "reason": "Closed-world synthesis requires a registry-backed KG anchor.",
                 "user_query": user_query,
-                "suggested_anchor": suggested_anchor,
+                "suggested_anchors": suggested_anchors,
                 "requirement_analysis": requirement_analysis,
             }
 
@@ -549,7 +655,6 @@ class OgenEngine:
             requirement_analysis,
             anchor_uri,
             retrieved_children,
-            context_mode,
         )
 
     def _generate_ui_with_context(
@@ -558,14 +663,11 @@ class OgenEngine:
         requirement_analysis: dict,
         anchor_name: str,
         retrieved_children: list,
-        context_mode: str,
     ) -> dict:
         """
         Generate UI using Graph Context with iterative validation.
         """
         constraints = []
-        if context_mode == "low-vision":
-            constraints = ["High Contrast Theme", "Base Font Size 24px"]
 
         allowed_component_ids = [
             (c.get("id") or c.get("type") or c.get("label"))
@@ -665,7 +767,7 @@ class OgenEngine:
     """
 
             response = self.client.chat.completions.create(
-                model=self.model_config.get("generation", "gpt-5"),
+                model=self.model_config.get("generation"),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -684,7 +786,6 @@ class OgenEngine:
             if not validation_errors:
                 return {
                     "source_anchor": anchor_name,
-                    "reasoning_mode": context_mode,
                     "generated_spec": llm_output,
                     "requirement_analysis": requirement_analysis,
                     "validated": True,
@@ -698,7 +799,6 @@ class OgenEngine:
             "error": "Failed to generate a valid UI specification within retry limit.",
             "reason": "Iterative validation failed after 3 attempts.",
             "source_anchor": anchor_name,
-            "reasoning_mode": context_mode,
             "generated_spec": llm_output,
             "requirement_analysis": requirement_analysis,
             "validated": False,
@@ -836,11 +936,6 @@ class OgenEngine:
 
         # Build a new store in isolation
         new_store = Store()
-        current_dir = Path(__file__).parent
-        ontology_path = current_dir / "ogen-core.ttl"
-
-        with open(ontology_path, "rb") as f:
-            new_store.load(f, "text/turtle", base_iri="http://ogen.ai/ontology/")
 
         ttl_bytes = ttl_string.encode("utf-8")
         new_store.load(ttl_bytes, "text/turtle", base_iri=base_iri)
@@ -864,6 +959,13 @@ class OgenEngine:
             raise
     
     def _build_component_schema_map(self, retrieved_children: list) -> dict:
+        """Build a map of component_id -> JSON Schema for prop validation.
+
+        The propSchema stored in Design Studio / KG may be a raw property map
+        (e.g. {"label": {"type": "string"}, "type": {"type": "string"}}),
+        not a valid JSON Schema. We wrap it in {"type": "object", "properties": ...}
+        so that Draft7Validator can process it correctly.
+        """
         schema_map = {}
         for c in retrieved_children:
             if not isinstance(c, dict):
@@ -873,7 +975,15 @@ class OgenEngine:
             prop_schema = c.get("propSchema")
 
             if cid and isinstance(prop_schema, dict):
-                schema_map[cid] = prop_schema
+                # If the schema is already a valid JSON Schema (has top-level "type": "object"),
+                # use it as-is. Otherwise, treat it as a properties map and wrap it.
+                if prop_schema.get("type") == "object" and "properties" in prop_schema:
+                    schema_map[cid] = prop_schema
+                else:
+                    schema_map[cid] = {
+                        "type": "object",
+                        "properties": prop_schema,
+                    }
 
         return schema_map
 

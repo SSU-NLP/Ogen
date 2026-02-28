@@ -258,7 +258,7 @@
   <footer class="input-area">
     <div class="input-wrapper">
       <form class="input-box" on:submit|preventDefault={handleSend}>
-        <input bind:value={query} placeholder="Message Ogen UI..." />
+        <input bind:value={query} placeholder="Example: How do I Login?" />
         <button type="submit" disabled={!query.trim()}> ➤ </button>
       </form>
     </div>

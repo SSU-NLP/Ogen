@@ -1,5 +1,5 @@
 """
-이벤트 스트림 타입 정의 및 처리 함수
+Event Stream Type Definition and Processing Functions
 """
 from typing import TypedDict, Literal, AsyncIterator
 from enum import Enum
@@ -7,7 +7,7 @@ import json
 
 
 class StreamEventType(str, Enum):
-    """스트림 이벤트 타입"""
+    """Stream event types"""
     TEXT = "text"
     UI = "ui"
     ERROR = "error"
@@ -15,7 +15,7 @@ class StreamEventType(str, Enum):
 
 
 class StreamEvent(TypedDict, total=False):
-    """스트림 이벤트 구조"""
+    """Stream event structure"""    
     type: StreamEventType
     content: str | None
     uiTree: dict | None
@@ -24,13 +24,13 @@ class StreamEvent(TypedDict, total=False):
 
 def format_sse_event(event: StreamEvent) -> str:
     """
-    스트림 이벤트를 SSE 형식으로 변환
+    Convert stream event to SSE format
     
     Args:
-        event: StreamEvent 딕셔너리
+        event: StreamEvent dictionary
     
     Returns:
-        str: SSE 형식 문자열 ("data: {...}\n\n")
+        str: SSE format string ("data: {...}\n\n")
     """
     # Enum을 문자열로 변환
     event_dict = {
@@ -47,13 +47,13 @@ def format_sse_event(event: StreamEvent) -> str:
 
 def parse_sse_data(data: str) -> StreamEvent | None:
     """
-    SSE 데이터를 StreamEvent로 파싱
+    Parse SSE data into StreamEvent
     
     Args:
-        data: SSE "data: {...}" 형식의 문자열
+        data: SSE "data: {...}" format string
     
     Returns:
-        StreamEvent | None: 파싱된 이벤트 또는 None
+        StreamEvent | None: Parsed event or None
     """
     try:
         if data.startswith("data: "):

@@ -1,5 +1,5 @@
 """
-UI 생성 과정 추상화
+UI Generation Pipeline Abstraction
 """
 
 from typing import AsyncIterator
@@ -9,26 +9,26 @@ from .stream import StreamEvent, StreamEventType
 
 class UIGenerationPipeline:
     """
-    UI 생성의 전체 파이프라인을 관리하는 클래스
-    각 단계를 독립적으로 실행 가능하며, 단계별 결과를 캡슐화
+    Class that manages the entire UI generation pipeline.
+    Each stage can be executed independently and encapsulates per-step results.
     """
 
     def __init__(self, engine: OgenEngine):
         """
         Args:
-            engine: OgenEngine 인스턴스
+            engine: OgenEngine instance
         """
         self.engine = engine
 
     def analyze_requirement(self, user_query: str) -> dict:
         """
-        요청 분석 단계
+        Requirement analysis step.
 
         Args:
-            user_query: 사용자 요청 문자열
+            user_query: User request string
 
         Returns:
-            dict: 요청 분석 결과
+            dict: Requirement analysis result
         """
         return self.engine.analyze_requirement(user_query)
 
@@ -36,14 +36,14 @@ class UIGenerationPipeline:
         self, user_query: str, requirement_analysis: dict | None = None
     ) -> str | None:
         """
-        앵커 노드 찾기 단계
+        Anchor node discovery step.
 
         Args:
-            user_query: 사용자 요청 문자열
-            requirement_analysis: 요청 분석 결과 (선택적)
+            user_query: User request string
+            requirement_analysis: Requirement analysis result (optional)
 
         Returns:
-            str | None: 앵커 노드 URI 또는 None
+            str | None: Anchor node URI or None
         """
         return self.engine.find_anchor_node_with_llm(user_query, requirement_analysis)
 
@@ -54,13 +54,13 @@ class UIGenerationPipeline:
         requirement_analysis: dict | None = None,
     ) -> list:
         """
-        Graph Context 검색 단계
+        Graph context retrieval step.
 
         Args:
-            anchor_uri: 앵커 노드 URI
+            anchor_uri: Anchor node URI
 
         Returns:
-            list: 하위 컴포넌트 정보 리스트
+            list: List of sub-component information
         """
         return self.engine.get_subgraph_context(
             anchor_uri,
@@ -74,39 +74,36 @@ class UIGenerationPipeline:
         requirement_analysis: dict,
         anchor_name: str,
         context: list,
-        context_mode: str = "default",
     ) -> dict:
         """
-        Context를 활용한 UI 생성
+        Generate UI with Context
 
         Args:
-            user_query: 사용자 요청 문자열
-            requirement_analysis: 요청 분석 결과
-            anchor_name: 앵커 노드 이름
-            context: Graph Context (하위 컴포넌트 정보)
-            context_mode: 컨텍스트 모드 (default, low-vision 등)
+            user_query: User request string
+            requirement_analysis: Requirement analysis result
+            anchor_name: Anchor node name
+            context: Graph context (sub-component information)
 
         Returns:
-            dict: UI 생성 결과
+            dict: UI generation result
         """
         return self.engine._generate_ui_with_context(
-            user_query, requirement_analysis, anchor_name, context, context_mode
+            user_query, requirement_analysis, anchor_name, context
         )
 
 
 
     async def generate_ui_stream(
-        self, user_query: str, context_mode: str = "default"
+        self, user_query: str
     ) -> AsyncIterator[StreamEvent]:
         """
-        UI 생성 과정을 스트리밍으로 제공
+        Generate UI with Context
 
         Args:
-            user_query: 사용자 요청 문자열
-            context_mode: 컨텍스트 모드
+            user_query: user request
 
         Yields:
-            StreamEvent: 각 단계별 이벤트
+            StreamEvent: each step event
         """
         # Step 1: Analyze requirement
         yield StreamEvent(
@@ -150,7 +147,7 @@ class UIGenerationPipeline:
             type=StreamEventType.TEXT, content="Generating UI..."
         )
         result = self.generate_with_context(
-            user_query, requirement_analysis, anchor_uri, context, context_mode
+            user_query, requirement_analysis, anchor_uri, context
         )
 
         if result.get("error"):
@@ -164,17 +161,17 @@ class UIGenerationPipeline:
         yield StreamEvent(type=StreamEventType.DONE)
 
 
-# 독립 함수들 (선택적 사용)
+# Standalone functions (optional usage)
 def analyze_user_requirement(engine: OgenEngine, user_query: str) -> dict:
     """
-    요청 분석 함수
+    Requirement analysis function.
 
     Args:
-        engine: OgenEngine 인스턴스
-        user_query: 사용자 요청 문자열
+        engine: OgenEngine instance
+        user_query: User request string
 
     Returns:
-        dict: 요청 분석 결과
+        dict: Requirement analysis result
     """
     return engine.analyze_requirement(user_query)
 
@@ -183,15 +180,15 @@ def find_ui_anchor(
     engine: OgenEngine, user_query: str, requirement_analysis: dict | None = None
 ) -> str | None:
     """
-    앵커 노드 찾기 함수
+    Anchor node discovery function.
 
     Args:
-        engine: OgenEngine 인스턴스
-        user_query: 사용자 요청 문자열
-        requirement_analysis: 요청 분석 결과 (선택적)
+        engine: OgenEngine instance
+        user_query: User request string
+        requirement_analysis: Requirement analysis result (optional)
 
     Returns:
-        str | None: 앵커 노드 URI 또는 None
+        str | None: Anchor node URI or None
     """
     return engine.find_anchor_node_with_llm(user_query, requirement_analysis)
 
@@ -201,20 +198,18 @@ def generate_ui_spec(
     user_query: str,
     requirement_analysis: dict | None = None,
     anchor_uri: str | None = None,
-    context_mode: str = "default",
 ) -> dict:
     """
-    UI 스펙 생성 함수 (전체 과정을 한 번에)
+    UI spec generation function (runs the full pipeline at once).
 
     Args:
-        engine: OgenEngine 인스턴스
-        user_query: 사용자 요청 문자열
-        requirement_analysis: 요청 분석 결과 (선택적, 없으면 자동 분석)
-        anchor_uri: 앵커 노드 URI (선택적, 없으면 자동 검색)
-        context_mode: 컨텍스트 모드
+        engine: OgenEngine instance
+        user_query: User request string
+        requirement_analysis: Requirement analysis result (optional; auto-analyzed if omitted)
+        anchor_uri: Anchor node URI (optional; auto-discovered if omitted)
 
     Returns:
-        dict: UI 생성 결과
+        dict: UI generation result
     """
     pipeline = UIGenerationPipeline(engine)
 
@@ -240,5 +235,5 @@ def generate_ui_spec(
     )
 
     return pipeline.generate_with_context(
-        user_query, requirement_analysis, anchor_uri, context, context_mode
+        user_query, requirement_analysis, anchor_uri, context
     )

@@ -57,8 +57,7 @@ ogen-ui/
 │   │       ├── engine.py        # OgenEngine - KG reasoning engine
 │   │       ├── ui_generator.py  # UIGenerationPipeline
 │   │       ├── tools.py         # LangChain Tool wrapper
-│   │       ├── stream.py        # SSE event type definitions
-│   │       └── ogen-core.ttl    # Core ontology (Atomic Design)
+│   │       └── stream.py        # SSE event type definitions
 │   │
 │   ├── svelte/                   # @ogen/svelte - Frontend runtime
 │   │   ├── index.ts             # OgenRuntime, OgentRuntime

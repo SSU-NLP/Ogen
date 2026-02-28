@@ -13,13 +13,10 @@ class GenerateUIToolInput(BaseModel):
     """Input schema for UI generation function"""
 
     user_query: str = Field(description="User's UI generation request")
-    context_mode: str = Field(
-        default="default", description="Context mode (default, low-vision, etc.)"
-    )
 
 
 def generate_ui(
-    pipeline: UIGenerationPipeline, user_query: str, context_mode: str = "default"
+    pipeline: UIGenerationPipeline, user_query: str
 ) -> dict:
     """
     UI generation function - wrapped as a Langchain Tool for use
@@ -27,7 +24,6 @@ def generate_ui(
     Args:
         pipeline: UIGenerationPipeline instance
         user_query: User's UI generation request
-        context_mode: Context mode
 
     Returns:
         dict: UI generation result
@@ -63,7 +59,7 @@ def generate_ui(
             }
 
         result = pipeline.generate_with_context(
-            user_query, requirement_analysis, anchor_uri, context, context_mode
+            user_query, requirement_analysis, anchor_uri, context
         )
 
         if result.get("error"):
@@ -89,7 +85,7 @@ def generate_ui(
 
 
 # Langchain Tool wrapper (optional, used in demo server)
-def create_langchain_tool(pipeline: UIGenerationPipeline):
+def create_ogen_tool(pipeline: UIGenerationPipeline):
     """
     Create a Langchain Tool (optional dependency)
     Wraps with langchain_core.tools.BaseTool for use in the demo server
@@ -124,7 +120,6 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
             Rules:
             - Never invent component types that do not exist in the knowledge graph.
             - If you cannot map the request to existing components, ask a clarifying question instead.
-            - Use `context_mode` from the conversation if provided.
 
             Examples:
             - "로그인 폼 만들어줘"
@@ -138,17 +133,17 @@ def create_langchain_tool(pipeline: UIGenerationPipeline):
                 super().__init__(**kwargs)
                 self._pipeline = pipeline
 
-            def _run(self, user_query: str, context_mode: str = "default") -> str:
+            def _run(self, user_query: str) -> str:
                 # ToolMessage content should be JSON for reliable parsing in SSE.
                 return json.dumps(
-                    generate_ui(self._pipeline, user_query, context_mode),
+                    generate_ui(self._pipeline, user_query),
                     ensure_ascii=False,
                 )
 
             async def _arun(
-                self, user_query: str, context_mode: str = "default"
+                self, user_query: str
             ) -> str:
-                return self._run(user_query, context_mode)
+                return self._run(user_query)
 
         return GenerateUITool(pipeline=pipeline)
     except ImportError:

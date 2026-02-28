@@ -8,7 +8,7 @@ from .ui_generator import (
 from .tools import (
     GenerateUIToolInput,
     generate_ui,
-    create_langchain_tool
+    create_ogen_tool
 )
 from .graph import GraphState
 from .stream import StreamEvent, StreamEventType, format_sse_event, parse_sse_data
@@ -21,7 +21,7 @@ __all__ = [
     "generate_ui_spec",
     "GenerateUIToolInput",
     "generate_ui",
-    "create_langchain_tool",
+    "create_ogen_tool",
     "GraphState",
     "StreamEvent",
     "StreamEventType",

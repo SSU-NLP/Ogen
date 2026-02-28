@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from ogen_stream.engine import OgenEngine
 from ogen_stream.ui_generator import UIGenerationPipeline
-from ogen_stream.tools import create_langchain_tool
+from ogen_stream.tools import create_ogen_tool
 from ogen_stream.stream import StreamEvent, StreamEventType, format_sse_event
 
 # load .env
@@ -43,11 +43,10 @@ try:
         persistence_dir=os.path.join(os.path.dirname(__file__), "ogen_data"),
         model_config_path=os.getenv("OGEN_MODEL_CONFIG_PATH"),
     )
-    print("✅ Ogen Engine initialized successfully (Ontology loaded).")
 
     pipeline = UIGenerationPipeline(engine)
 
-    ui_tool = create_langchain_tool(pipeline)
+    ui_tool = create_ogen_tool(pipeline)
 
     # Generate Agent (Tool included)
     # Use an OpenAI-compatible tool-calling model.
@@ -65,7 +64,7 @@ try:
         "(B) calling the generate_ui tool when showing a UI would help the user. "
         "If a UI would help, you MUST call generate_ui. "
         "Never invent component types not present in the knowledge graph. "
-        "When calling generate_ui, pass user_query exactly and pass context_mode when relevant."
+        "When calling generate_ui, pass user_query exactly as the user stated it."
     )
 
     agent = create_agent(llm, tools, system_prompt=TOOL_CALLING_SYSTEM_PROMPT)
@@ -310,7 +309,7 @@ async def chat_stream(message: str, context: str = "default"):
 
 @app.post("/chat/stream")
 async def chat_stream_post(request: ChatRequest):
-    event_generator = _chat_stream_event_generator(request.message, request.context)
+    event_generator = _chat_stream_event_generator(request.message, "default")
     return EventSourceResponse(event_generator())
 
 
