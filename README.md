@@ -210,16 +210,27 @@ Add the same metadata object (JSON format) under the component key. This file is
 
 ### Visual Registration (Design Studio)
 
-The **Design Studio** UI (`/design-studio`) provides a no-code workflow:
+The **Design Studio** provides a no-code workflow for managing component metadata and syncing the Knowledge Graph.
+
+#### Accessing Design Studio
+
+After starting the dev servers (`./start.sh`), navigate to:
+
+```
+http://localhost:5173/design-studio
+```
+
+#### Workflow
 
 ```
  Scan Components  →  Edit Metadata  →  Generate TTL  →  Sync to Backend
 ```
 
-1. **Scan** — The scanner (`@ogen/design-studio/scanner`) reads `.svelte` files and auto-extracts props.
-2. **Edit** — The studio UI lets you set `category`, `keywords`, `hasPart`, accessibility fields, etc.
-3. **Save Metadata** — Clicking **Save** persists the edited metadata to `design-studio.metadata.json` via `POST /api/design-studio/metadata` (dev mode only).
-4. **Generate TTL** — The generator (`@ogen/design-studio/generator`) converts the metadata into RDF/Turtle triples.
-5. **Sync** — The generated TTL is sent to the backend, which loads it into the Knowledge Graph for KG-grounded reasoning.
+1. **Scan** — Click **Scan** to detect all `.svelte` components and auto-extract props.
+2. **Edit** — Use the studio UI to set `category` (Atom/Molecule/Organism/Template), `keywords`, `hasPart`, accessibility fields, and `propSchema`.
+3. **Save Metadata** — Click **Save** to persist metadata to `design-studio.metadata.json`.
+4. **Generate & Sync** — Click **Connect** to generate RDF/Turtle triples and sync to the backend KG.
+
+> **Note**: On first visit, the frontend automatically connects the design system to the backend if not already connected.
 
 > Even when using Design Studio, you still need to manually add the `import` and registry entry in `ds.ts` for the UI renderer to resolve the component at runtime.
