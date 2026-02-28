@@ -114,8 +114,11 @@ cp .env.example .env
 ### Running the Demo
 
 ```bash
-# Start both frontend and backend servers
+# macOS / Linux
 ./start.sh
+
+# Windows
+start.bat
 ```
 
 This will launch:
