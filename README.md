@@ -91,6 +91,13 @@ ogen-ui/
 | **pnpm** | latest | Node.js package manager |
 | **uv** | latest | Python package manager |
 
+### Setup
+
+If you don't have **uv** or **pnpm** installed yet, visit the links below and follow the official installation guide:
+
+- **uv** → [https://docs.astral.sh/uv/getting-started/installation/](https://docs.astral.sh/uv/getting-started/installation/)
+- **pnpm** → [https://pnpm.io/installation](https://pnpm.io/installation)
+
 ### Installation
 
 ```bash
@@ -114,12 +121,9 @@ cp .env.example .env
 ### Running the Demo
 
 ```bash
-# macOS / Linux
+# macOS / Linux RECOMMENDED
 ./start.sh
 
-# Windows
-start.bat
-```
 
 This will launch:
 - **Frontend**: http://localhost:5173 (SvelteKit + Vite)
