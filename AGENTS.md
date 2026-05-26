@@ -2,6 +2,17 @@
 
 This file contains essential information for agentic coding agents working in this repository.
 
+## Agent Instruction Ownership
+
+`AGENTS.md` is the canonical source for shared agent instructions in this repository. Keep repository-wide rules, commands, architecture notes, and shared safety expectations here.
+
+Tool-specific files should be thin adapters:
+
+- `CLAUDE.md` imports this file for Claude Code and should only contain Claude-specific routing or exceptions.
+- `.claude/` is reserved for Claude Code settings, skills, commands, hooks, and local permissions.
+- `.agents/` stores shared agent assets such as reusable skills, hook scripts, templates, and cross-tool notes.
+- If another agent needs hooks or settings, keep its native config file minimal and call scripts from `.agents/hooks/` instead of duplicating policy.
+
 ## Project Overview
 
 Ogen-UI is a monorepo containing an AI-driven UI generation system with:
@@ -318,3 +329,54 @@ uv run pytest test_module.py::test_function  # Run single test
 - TTL files are loaded from `packages/ogen_stream/src/ogen_stream/ogen-core.ttl`
 - Design Studio is now at `packages/design-studio/` (npm: @ogen/design-studio)
 - Access Design Studio UI at: http://localhost:5173/design-studio
+
+## System Architecture
+
+Ogen is an **ontology-based generative UI engine**: a SvelteKit + FastAPI monorepo where the backend turns natural-language requests into JSON UI specs by reasoning over an RDF/TTL knowledge graph (KG) of design-system components.
+
+Required env vars in `.env`: `OPENAI_API_KEY` (required), `OPENAI_BASE_URL` (optional, for OpenAI-compatible endpoints), `OGEN_MODEL` (optional, single model used for all pipeline stages, default: `gpt-5`).
+
+Workspaces: `pyproject.toml` (uv) declares `apps/server` and `packages/ogen_stream`; `pnpm-workspace.yaml` covers `apps/*` and `packages/*`. The Python package is consumed via `[tool.uv.sources] ogen-stream = { workspace = true }`.
+
+### KG-grounded reasoning pipeline (`packages/ogen_stream/src/ogen_stream/engine.py`)
+
+`OgenEngine.reason()` is the heart of the system. It runs a 4-stage closed-world synthesis pipeline — **the engine refuses to invent components not present in the KG**, and returns an `error` dict instead of falling back. Any change to generation must preserve this guarantee.
+
+1. **Requirement analysis** — LLM extracts intent, required components, and a suggested anchor name (`analyze_requirement`, model: `analysis`).
+2. **Anchor selection** — sentence-transformer (`all-MiniLM-L6-v2`) embeds all node labels, top-K cosine candidates are passed to an LLM that picks one URI (`find_anchor_node_with_llm`, model: `anchor`).
+3. **Subgraph retrieval with agentic pruning** — BFS from anchor over `ex:hasPart` edges (`get_subgraph_context`, max_depth=2). When a node has ≥3 children, or at depth 0, an LLM filters them down to those relevant to the user query (`_agentic_filter_children`, model: `pruning`).
+4. **Validated UI generation** — LLM produces a UI tree (`_generate_ui_with_context`, model: `generation`) constrained to `AllowedComponentIds` from the retrieved subgraph; output is validated against per-component JSON Schemas with `Draft7Validator` and **retried up to 3 times** with validation errors fed back as repair feedback.
+
+Default model: `gpt-5` for all pipeline stages. Override via `OGEN_MODEL` env var.
+
+### Knowledge graph storage
+
+- pyoxigraph `Store` holds two layers loaded into the default graph: the core ontology (`packages/ogen_stream/src/ogen_stream/ogen-core.ttl` — Atomic Design vocabulary) plus user-supplied design-system TTL.
+- User TTL arrives via `POST /api/connect` and is persisted to `apps/server/ogen_data/user_graph.trig` (legacy `user_graph.ttl` is also read on startup). On `force=true` reconnect, `_rebuild_store_with_user_data` builds a new `Store` in isolation and atomically swaps it under a `threading.Lock` so the engine never sees a partially-loaded graph.
+- After any load, `_build_index()` re-encodes node label embeddings for anchor search.
+- Conventions for design-system TTL: nodes need `rdfs:label` to be indexed; parent→child links use `ex:hasPart`; generated component `id` is the URI fragment after `#` or last `/`. The frontend component registry must use that same id as its key.
+
+### Server entrypoint (`apps/server/main.py`)
+
+- Constructs `OgenEngine` once at startup, wraps `UIGenerationPipeline` in a LangChain tool (`create_langchain_tool`), and builds a LangGraph agent (`langchain.agents.create_agent`) over `ChatOpenAI(model="gpt-5")` with a system prompt that forbids inventing component types.
+- The agent is the streaming path. `/chat/stream` (both GET and POST) calls `agent.astream(..., stream_mode="updates")` and re-emits SSE frames typed as `StreamEventType.{TEXT,UI,DONE,ERROR}` from `stream.py`. The bridge logic in `_chat_stream_event_generator` converts AI message deltas to `text` events and tool-result `ui_tree` payloads to `ui` events. EventSource (browser) requires GET.
+- `POST /generate-ui` is the synchronous (non-agent) path that calls `engine.reason()` directly.
+
+### Frontend (`apps/front`, `packages/svelte`)
+
+- `@ogen/svelte` exports two runtimes: `OgenRuntime` (one-shot `/generate-ui`) and `OgentRuntime` (agentic chat over `/chat/stream`, with both `EventSource`-based `sendChatMessage` and fetch+streaming `sendMessage` paths). Both expose an Observer-style `subscribe(listener)` API.
+- `UIRenderer.svelte` recursively renders the JSON UI tree by looking up `node.type` in a component registry passed from the app. The frontend's local design system lives in `apps/front/src/lib/components` with metadata in `apps/front/src/lib/design-studio.metadata.json` and `ds.ts`.
+- `ttl-generator.ts` (in `@ogen/svelte`) and `@ogen/design-studio` together form a UI-side authoring loop: scan components → edit metadata → generate TTL → POST to `/api/connect`. The Design Studio UI is at `http://localhost:5173/design-studio`.
+
+### Where to look when changing things
+
+- Pipeline behavior, validation, pruning thresholds, model selection → `engine.py`.
+- New SSE event types → `stream.py` + handlers in `main.py:_chat_stream_event_generator` + `OgentRuntime.handleStreamChunk` in `packages/svelte/index.ts`.
+- New endpoints → `apps/server/main.py`. CORS is wide-open (`allow_origins=["*"]`) for dev.
+- TTL ontology changes → `ogen-core.ttl`. After editing, restart the backend (it loads at construction time) and re-index will run automatically when user data is reloaded.
+
+## Shared Skills
+
+Portable agent skills live in `.agents/skills/<skill-name>/SKILL.md`. Codex reads this location directly. Claude Code project skills should point to shared skills from `.claude/skills/<skill-name>` with a symlink when the workflow is meant to be identical across agents.
+
+Do not edit a symlinked `.claude/skills/<skill-name>` as if it were the source; edit the matching `.agents/skills/<skill-name>` directory instead. Claude-only skills may remain as real directories under `.claude/skills/`.
