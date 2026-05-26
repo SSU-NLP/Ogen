@@ -15,6 +15,7 @@
   let query: string = "";
   let runtime: OgentRuntime | null = null;
   let messages: ChatMessage[] = [];
+  let welcomeShown = false;
   let chatContainer: HTMLElement | null = null;
   let connectionStatus: "disconnected" | "connecting" | "connected" | "error" =
     "disconnected";
@@ -53,25 +54,27 @@
 
     // 상태 구독 (runtime is guaranteed to be non-null here)
     const unsubscribe = runtime.subscribe((state) => {
-      messages = state.messages;
       connectionStatus = state.connectionStatus;
 
-      // Track UI loading states
+      if (state.messages.length > 0) {
+        messages = state.messages;
+      } else if (state.connectionStatus === "connected" && !welcomeShown) {
+        welcomeShown = true;
+        messages = [
+          {
+            id: "welcome",
+            role: "assistant",
+            content: "Hi! What can I help you with?",
+            timestamp: new Date(),
+          },
+        ];
+      }
+
       loadingUIMessages = new Set(
         state.messages
           .filter((m) => m.role === "assistant" && m.isStreaming && !m.uiTree)
           .map((m) => m.id),
       );
-
-      // 연결 시 환영 메시지
-      if (state.connectionStatus === "connected" && messages.length === 0) {
-        messages.push({
-          id: "welcome",
-          role: "assistant",
-          content: "Hi! What can I help you with?",
-          timestamp: new Date(),
-        });
-      }
     });
 
     // Check backend connection status first
