@@ -77,6 +77,7 @@ except Exception as e:
 
 class UIRequest(BaseModel):
     query: str
+    context: str = "default"
 
 
 class ChatRequest(BaseModel):
@@ -99,7 +100,7 @@ def generate_ui(request: UIRequest):
     print(f"📩 Received Query: {request.query}")
 
     try:
-        result = engine.reason(request.query)
+        result = engine.reason(request.query, context_mode=request.context)
 
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
@@ -188,12 +189,12 @@ def _chat_stream_event_generator(message: str, context: str):
             config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
             emitted_text = ""
 
-            content = message if context == "default" else f"{message} [context_mode: {context}]"
+            user_content = message if context == "default" else f"{message} [context_mode: {context}]"
             inputs = {
                 "messages": [
                     {
                         "role": "user",
-                        "content": content,
+                        "content": user_content,
                     }
                 ]
             }
