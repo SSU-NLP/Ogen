@@ -16,13 +16,11 @@ class OgenEngine:
         openai_api_key: str,
         persistence_dir: str = "./ogen_data",
         openai_base_url: str | None = None,
-        model_config: dict[str, str] | None = None,
-        model_config_path: str | None = None,
     ):
         self.client = openai.OpenAI(api_key=openai_api_key, base_url=openai_base_url)
+        self.model = os.getenv("OGEN_MODEL", "gpt-5")
         self.persistence_dir = Path(persistence_dir)
         self.persistence_dir.mkdir(exist_ok=True)
-        self.model_config = self._load_model_config(model_config, model_config_path)
 
         self._store_lock = None
 
@@ -88,38 +86,6 @@ class OgenEngine:
             self._store_lock = threading.Lock()
         except Exception:
             self._store_lock = None
-
-    def _load_model_config(
-        self,
-        model_config: dict[str, str] | None,
-        model_config_path: str | None,
-    ) -> dict[str, str]:
-        defaults = {
-            "analysis": "gpt-5",
-            "anchor": "gpt-4o-mini",
-            "generation": "gpt-5",
-            "pruning": "gpt-5-mini",
-        }
-
-        config: dict[str, str] = {**defaults}
-
-        if model_config_path:
-            try:
-                with open(model_config_path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                if isinstance(loaded, dict):
-                    for key, value in loaded.items():
-                        if isinstance(key, str) and isinstance(value, str) and value:
-                            config[key] = value
-            except Exception as e:
-                print(f"⚠️ Failed to load model config JSON: {e}")
-
-        if model_config:
-            for key, value in model_config.items():
-                if isinstance(key, str) and isinstance(value, str) and value:
-                    config[key] = value
-
-        return config
 
     def _build_index(self):
         """Embed all nodes in the graph (unified search across GRAPH_CORE + GRAPH_USER)"""
@@ -280,7 +246,7 @@ class OgenEngine:
 
         try:
             response = self.client.chat.completions.create(
-                model=self.model_config.get("pruning", "gpt-4o-mini"),
+                model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -330,8 +296,6 @@ class OgenEngine:
 
             # Attempt JSON parsing (for complex data like Schema or Rules)
             try:
-                import json
-
                 parsed_value = json.loads(o_val)
             except:
                 parsed_value = o_val
@@ -398,7 +362,7 @@ class OgenEngine:
     """
 
         response = self.client.chat.completions.create(
-            model=self.model_config.get("analysis", "gpt-5"),
+            model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -482,7 +446,7 @@ class OgenEngine:
             """
 
         response = self.client.chat.completions.create(
-            model=self.model_config.get("anchor", "gpt-5"),
+            model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -665,7 +629,7 @@ class OgenEngine:
     """
 
             response = self.client.chat.completions.create(
-                model=self.model_config.get("generation", "gpt-5"),
+                model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
