@@ -188,11 +188,12 @@ def _chat_stream_event_generator(message: str, context: str):
             config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
             emitted_text = ""
 
+            content = message if context == "default" else f"{message} [context_mode: {context}]"
             inputs = {
                 "messages": [
                     {
                         "role": "user",
-                        "content": f"{message}",
+                        "content": content,
                     }
                 ]
             }
