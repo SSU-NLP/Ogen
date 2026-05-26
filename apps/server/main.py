@@ -41,7 +41,6 @@ try:
         openai_api_key=API_KEY,
         openai_base_url=BASE_URL,
         persistence_dir=os.path.join(os.path.dirname(__file__), "ogen_data"),
-        model_config_path=os.getenv("OGEN_MODEL_CONFIG_PATH"),
     )
     print("✅ Ogen Engine initialized successfully (Ontology loaded).")
 
@@ -52,7 +51,7 @@ try:
     # Generate Agent (Tool included)
     # Use an OpenAI-compatible tool-calling model.
     llm = ChatOpenAI(
-        model="gpt-5",
+        model=os.getenv("OGEN_MODEL", "gpt-5"),
         api_key=SecretStr(API_KEY),
         base_url=BASE_URL,
         temperature=0,
@@ -82,6 +81,7 @@ class UIRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    context: str = "default"
 
 
 class ConnectRequest(BaseModel):
