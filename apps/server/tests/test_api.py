@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Pydantic model defaults — field omitted entirely (regression test)
@@ -36,19 +36,19 @@ def test_connect_status_returns_200(client):
 # ---------------------------------------------------------------------------
 
 def test_generate_ui_passes_default_context(client, engine):
-    engine.reason = MagicMock(return_value={
-        "generated_spec": {"type": "Button", "props": {}}
-    })
-    client.post("/generate-ui", json={"query": "make a button"})
-    engine.reason.assert_called_once_with("make a button", context_mode="default")
+    mock_return = {"generated_spec": {"type": "Button", "props": {}}}
+    with patch.object(engine, "reason", return_value=mock_return) as mock_reason:
+        resp = client.post("/generate-ui", json={"query": "make a button"})
+        assert resp.status_code == 200
+        mock_reason.assert_called_once_with("make a button", context_mode="default")
 
 
 def test_generate_ui_passes_nondefault_context(client, engine):
-    engine.reason = MagicMock(return_value={
-        "generated_spec": {"type": "Button", "props": {}}
-    })
-    client.post("/generate-ui", json={"query": "make a button", "context": "low-vision"})
-    engine.reason.assert_called_once_with("make a button", context_mode="low-vision")
+    mock_return = {"generated_spec": {"type": "Button", "props": {}}}
+    with patch.object(engine, "reason", return_value=mock_return) as mock_reason:
+        resp = client.post("/generate-ui", json={"query": "make a button", "context": "low-vision"})
+        assert resp.status_code == 200
+        mock_reason.assert_called_once_with("make a button", context_mode="low-vision")
 
 
 # ---------------------------------------------------------------------------
