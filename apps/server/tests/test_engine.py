@@ -1,7 +1,4 @@
 import os
-import sys
-import pytest
-from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # OGEN_MODEL env var
@@ -9,15 +6,13 @@ from unittest.mock import MagicMock, patch
 
 def test_model_default(engine):
     """OGEN_MODEL unset → engine.model is 'gpt-5'."""
-    assert engine.model == os.environ.get("OGEN_MODEL", "gpt-5")
+    assert engine.model == "gpt-5"
 
 
 def test_model_from_env(tmp_path, monkeypatch):
     """OGEN_MODEL set before engine construction → engine.model picks it up.
-    Uses a fresh engine (not session fixture) to avoid module cache interference.
-    sys.modules.pop forces a clean re-import so os.getenv is evaluated again."""
+    Uses a fresh engine (not session fixture) to avoid module cache interference."""
     monkeypatch.setenv("OGEN_MODEL", "gpt-4o")
-    sys.modules.pop("ogen_stream.engine", None)
     from ogen_stream.engine import OgenEngine
 
     eng = OgenEngine(openai_api_key="test-key", persistence_dir=str(tmp_path))
