@@ -2,7 +2,6 @@
 # main.py creates engine/llm/agent at module import time; patching here
 # ensures those constructors see mocks when main is first imported by any test.
 import os
-import sys
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from unittest.mock import MagicMock, patch

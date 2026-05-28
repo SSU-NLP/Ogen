@@ -22,3 +22,6 @@ dev = [
 
 [tool.uv.sources]
 ogen-stream = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
