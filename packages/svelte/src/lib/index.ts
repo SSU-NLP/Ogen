@@ -151,10 +151,19 @@ export class OgenRuntime {
 }
 
 // ===== Chat Runtime Types =====
+/** An ordered piece of an assistant turn: streamed text or a rendered UI tree. */
+export type ChatSegment =
+    | { type: 'text'; text: string }
+    | { type: 'ui'; uiTree: UITree };
+
 export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    /** Assistant turns: ordered text/ui segments as they arrive (enables
+     *  interleaving + a single avatar per response). User turns use `content`. */
+    segments?: ChatSegment[];
+    /** @deprecated kept for back-compat; prefer `segments`. */
     uiTree?: UITree;
     timestamp: Date;
     isStreaming?: boolean;
@@ -197,6 +206,9 @@ export class OgentRuntime {
     private isConnected: boolean = false;
     private enableStreaming: boolean = false;
     private currentStreamingMessageId: string | null = null;
+    /** Stable per-session conversation id so the backend agent keeps memory
+     *  across turns (one conversation per runtime instance / page session). */
+    private readonly threadId: string = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     constructor(endpoint: string, options?: OgenChatRuntimeOptions) {
         this.endpoint = endpoint;
@@ -313,11 +325,12 @@ export class OgentRuntime {
         };
         this.addMessage(userMessage);
 
-        // 어시스턴트 메시지 생성 (로딩 상태)
+        // 어시스턴트 메시지 생성 (로딩 상태) — one message per turn, segments fill in order
         const assistantMessage: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
             content: '',
+            segments: [],
             timestamp: new Date(),
             isStreaming: true
         };
@@ -327,8 +340,8 @@ export class OgentRuntime {
         this.setState({ status: 'loading', error: null });
 
         try {
-            // SSE endpoint call
-            const url = `${this.endpoint}/chat/stream?message=${encodeURIComponent(message)}&context=${context}`;
+            // SSE endpoint call — thread_id keeps the backend conversation memory
+            const url = `${this.endpoint}/chat/stream?message=${encodeURIComponent(message)}&context=${context}&thread_id=${encodeURIComponent(this.threadId)}`;
             const eventSource = new EventSource(url);
 
             let isFinished = false;
@@ -358,9 +371,12 @@ export class OgentRuntime {
                     return;
                 }
 
-                // Check if current message has content
+                // Check if current message has any content (text or UI segment)
                 const currentMsg = this.state.messages.find(m => m.id === assistantMessage.id);
-                const hasContent = currentMsg && currentMsg.content && currentMsg.content.length > 0;
+                const hasContent = !!currentMsg && (
+                    (currentMsg.segments?.length ?? 0) > 0 ||
+                    (currentMsg.content?.length ?? 0) > 0
+                );
 
                 if (hasContent) {
                     // Content received, treat as success (connection closed but data received)
@@ -499,85 +515,78 @@ export class OgentRuntime {
         this.setState({ status: 'success' });
     }
 
+    /** Ensure there is a current assistant message to append segments to. */
+    private ensureStreamingMessage(): string {
+        if (this.currentStreamingMessageId) return this.currentStreamingMessageId;
+        const assistantMessage: ChatMessage = {
+            id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            role: 'assistant',
+            content: '',
+            segments: [],
+            timestamp: new Date(),
+            isStreaming: true
+        };
+        this.addMessage(assistantMessage);
+        this.currentStreamingMessageId = assistantMessage.id;
+        return assistantMessage.id;
+    }
+
+    /** Append a text delta or a UI tree to the current assistant message's
+     *  ordered segment list, keeping a single message (one avatar) per turn. */
+    private appendSegment(targetId: string, seg: ChatSegment): void {
+        const msg = this.state.messages.find(m => m.id === targetId);
+        if (!msg) return;
+        const segments = [...(msg.segments ?? [])];
+        const last = segments[segments.length - 1];
+
+        if (seg.type === 'text' && last && last.type === 'text') {
+            // Extend the trailing text block so consecutive deltas merge.
+            segments[segments.length - 1] = { type: 'text', text: last.text + seg.text };
+        } else {
+            segments.push(seg);
+        }
+
+        // Mirror concatenated text into `content` for back-compat consumers.
+        const content = segments
+            .filter((s): s is { type: 'text'; text: string } => s.type === 'text')
+            .map(s => s.text)
+            .join('');
+
+        this.updateMessage(targetId, { segments, content });
+    }
+
     private handleStreamChunk(chunk: StreamChunk, messageId: string): void {
         switch (chunk.type) {
             case 'text':
                 if (chunk.content) {
-                    if (!this.currentStreamingMessageId) {
-                        const assistantMessage: ChatMessage = {
-                            id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                            role: 'assistant',
-                            content: '',
-                            timestamp: new Date(),
-                            isStreaming: true
-                        };
-                        this.addMessage(assistantMessage);
-                        this.currentStreamingMessageId = assistantMessage.id;
-                    }
-
-                    const targetId = this.currentStreamingMessageId;
-                    const currentMessage = this.state.messages.find(m => m.id === targetId);
-                    if (!currentMessage || !targetId) return;
-
-                    const newContent = currentMessage.content + chunk.content;
-                    this.updateMessage(targetId, {
-                        content: newContent
-                    });
+                    const targetId = this.ensureStreamingMessage();
+                    this.appendSegment(targetId, { type: 'text', text: chunk.content });
                 }
                 break;
 
             case 'ui':
                 if (chunk.uiTree) {
-                    const currentId = this.currentStreamingMessageId;
-                    const currentMessage = currentId ? this.state.messages.find(m => m.id === currentId) : null;
-
-                    if (currentId && currentMessage) {
-                        if (!currentMessage.content) {
-                            this.removeMessage(currentId);
-                        } else {
-                            this.updateMessage(currentId, { isStreaming: false });
-                        }
-                    }
-
-                    const uiMessage: ChatMessage = {
-                        id: `assistant-ui-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                        role: 'assistant',
-                        content: '',
-                        uiTree: chunk.uiTree,
-                        timestamp: new Date()
-                    };
-                    this.addMessage(uiMessage);
-                    this.currentStreamingMessageId = null;
+                    // Same message, next segment — interleaves with text in order.
+                    const targetId = this.ensureStreamingMessage();
+                    this.appendSegment(targetId, { type: 'ui', uiTree: chunk.uiTree });
                 }
                 break;
 
-            case 'error':
-                if (this.currentStreamingMessageId) {
-                    this.updateMessage(this.currentStreamingMessageId, {
-                        content: `❌ Error: ${chunk.error || 'Unknown error'}`,
-                        isStreaming: false
-                    });
-                } else {
-                    this.addMessage({
-                        id: `assistant-error-${Date.now()}`,
-                        role: 'assistant',
-                        content: `❌ Error: ${chunk.error || 'Unknown error'}`,
-                        timestamp: new Date(),
-                        isStreaming: false
-                    });
-                }
-                this.setState({
-                    status: 'error',
-                    error: chunk.error || 'Unknown error'
+            case 'error': {
+                const targetId = this.ensureStreamingMessage();
+                this.appendSegment(targetId, {
+                    type: 'text',
+                    text: `❌ Error: ${chunk.error || 'Unknown error'}`
                 });
+                this.updateMessage(targetId, { isStreaming: false });
+                this.setState({ status: 'error', error: chunk.error || 'Unknown error' });
                 this.currentStreamingMessageId = null;
                 break;
+            }
 
             case 'done':
                 if (this.currentStreamingMessageId) {
-                    this.updateMessage(this.currentStreamingMessageId, {
-                        isStreaming: false
-                    });
+                    this.updateMessage(this.currentStreamingMessageId, { isStreaming: false });
                 }
                 this.currentStreamingMessageId = null;
                 break;

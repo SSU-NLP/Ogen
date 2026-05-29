@@ -10,6 +10,7 @@ from sse_starlette.sse import EventSourceResponse
 from sse_starlette.event import ServerSentEvent
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
+from langgraph.checkpoint.memory import InMemorySaver
 from ogen_stream.engine import OgenEngine
 from ogen_stream.ui_generator import UIGenerationPipeline
 from ogen_stream.tools import create_langchain_tool
@@ -67,7 +68,16 @@ try:
         "When calling generate_ui, pass user_query exactly and pass context_mode when relevant."
     )
 
-    agent = create_agent(llm, tools, system_prompt=TOOL_CALLING_SYSTEM_PROMPT)
+    # In-memory checkpointer gives the agent conversation memory keyed by
+    # thread_id, so repeated /chat/stream calls with the same thread_id form a
+    # single multi-turn conversation. (Dev-scoped: cleared on restart.)
+    checkpointer = InMemorySaver()
+    agent = create_agent(
+        llm,
+        tools,
+        system_prompt=TOOL_CALLING_SYSTEM_PROMPT,
+        checkpointer=checkpointer,
+    )
 
     print("✅ Langgraph Agent initialized successfully.")
 except Exception as e:
@@ -83,6 +93,7 @@ class UIRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     context: str = "default"
+    thread_id: str | None = None
 
 
 class ConnectRequest(BaseModel):
@@ -174,19 +185,23 @@ async def connect_knowledge_graph(request: ConnectRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _chat_stream_event_generator(message: str, context: str):
+def _chat_stream_event_generator(message: str, context: str, thread_id: str | None = None):
     """Shared SSE generator for chat streaming.
 
     Design goal:
     - Tool-calling only: UI JSON must come from the generate_ui tool.
     - LLM decides: If showing UI is helpful, call the tool.
+    - A stable thread_id (from the client) keeps conversation memory across
+      turns; a random fallback makes a one-off thread when none is supplied.
     """
+
+    resolved_thread_id = thread_id or f"thread_{os.urandom(4).hex()}"
 
     async def event_generator():
         try:
-            print(f"📩 Starting stream for message: {message} (Context: {context})")
+            print(f"📩 Starting stream for message: {message} (Context: {context}, thread: {resolved_thread_id})")
 
-            config = {"configurable": {"thread_id": f"thread_{os.urandom(4).hex()}"}}
+            config = {"configurable": {"thread_id": resolved_thread_id}}
             emitted_text = ""
 
             user_content = message if context == "default" else f"{message} [context_mode: {context}]"
@@ -301,18 +316,18 @@ def _chat_stream_event_generator(message: str, context: str):
 
 # Browser EventSource requires GET (no request body).
 @app.get("/chat/stream")
-async def chat_stream(message: str, context: str = "default"):
+async def chat_stream(message: str, context: str = "default", thread_id: str | None = None):
     """
     Response with Server-Sent Events
     When the agent calls a tool, it sends a UI event, and the text response is sent as a text event.
     """
-    event_generator = _chat_stream_event_generator(message, context)
+    event_generator = _chat_stream_event_generator(message, context, thread_id)
     return EventSourceResponse(event_generator())
 
 
 @app.post("/chat/stream")
 async def chat_stream_post(request: ChatRequest):
-    event_generator = _chat_stream_event_generator(request.message, request.context)
+    event_generator = _chat_stream_event_generator(request.message, request.context, request.thread_id)
     return EventSourceResponse(event_generator())
 
 

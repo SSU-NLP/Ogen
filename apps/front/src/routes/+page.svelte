@@ -19,7 +19,6 @@
   let chatContainer: HTMLElement | null = null;
   let connectionStatus: "disconnected" | "connecting" | "connected" | "error" =
     "disconnected";
-  let loadingUIMessages: Set<string> = new Set();
   let activeMetadata: Record<string, ComponentMetadata> =
     defaultDesignSystemMetadata;
 
@@ -69,12 +68,6 @@
           },
         ];
       }
-
-      loadingUIMessages = new Set(
-        state.messages
-          .filter((m) => m.role === "assistant" && m.isStreaming && !m.uiTree)
-          .map((m) => m.id),
-      );
     });
 
     // Check backend connection status first
@@ -147,29 +140,20 @@
     return unsubscribe;
   });
 
-  // Helper function to filter assistant message content
-  const getFilteredContent = (message: ChatMessage): string => {
-    if (message.role !== "assistant") return message.content;
+  // Ordered segments for an assistant turn. Falls back to content/uiTree for
+  // messages produced before the segment model (e.g. the welcome message).
+  type Segment =
+    | { type: "text"; text: string }
+    | { type: "ui"; uiTree: any };
 
-    // If UI tree exists, show only UI-related message
-    if (message.uiTree) {
-      return "";
+  const getSegments = (message: ChatMessage): Segment[] => {
+    if (message.segments && message.segments.length > 0) {
+      return message.segments as Segment[];
     }
-
-    // Filter out unwanted content patterns
-    let content = message.content;
-
-    // Remove JSON-like content, debug info, etc.
-    content = content.replace(/\{[^}]*\}/g, ""); // Remove JSON objects
-    content = content.replace(/```[\s\S]*?```/g, ""); // Remove code blocks
-    content = content.replace(/`[^`]*`/g, ""); // Remove inline code
-    content = content.replace(/🔄|⚡|📝|🎯|🔍|📊|🎨|💡|🚀/g, ""); // Remove emoji indicators
-
-    // Clean up extra whitespace
-    content = content.replace(/\s+/g, " ").trim();
-
-    // Return cleaned content or default message
-    return content || "";
+    const segs: Segment[] = [];
+    if (message.uiTree) segs.push({ type: "ui", uiTree: message.uiTree });
+    if (message.content) segs.push({ type: "text", text: message.content });
+    return segs;
   };
 
   const handleSend = async () => {
@@ -211,46 +195,50 @@
     <div class="messages">
       {#each messages as message (message.id)}
         <div class="message message-{message.role}">
+          <!-- One avatar per message/turn -->
           <div class="message-avatar">
             {message.role === "user" ? "U" : "A"}
           </div>
           <div class="message-content-wrapper">
-            <div class="message-content">
-              {#if message.role === "assistant"}
-                {getFilteredContent(message)}
-              {:else}
-                {message.content}
-              {/if}
-              {#if message.isStreaming && !message.uiTree}
-                <span class="cursor">▋</span>
-              {/if}
-            </div>
+            {#if message.role === "user"}
+              <div class="message-content">{message.content}</div>
+            {:else}
+              {@const segs = getSegments(message)}
+              <!-- Assistant: render text/UI segments in arrival order -->
+              {#each segs as seg, i (i)}
+                {#if seg.type === "text"}
+                  {#if seg.text.trim()}
+                    <div class="message-content">{seg.text}{#if message.isStreaming && i === segs.length - 1}<span class="cursor">▋</span>{/if}</div>
+                  {/if}
+                {:else if seg.type === "ui"}
+                  <div class="message-ui">
+                    <UIRenderer
+                      node={seg.uiTree}
+                      components={designSystem}
+                      metadata={activeMetadata}
+                    />
+                  </div>
+                {/if}
+              {/each}
 
-            {#if message.role === "assistant" && loadingUIMessages.has(message.id) && !message.uiTree}
-              <!-- Skeleton UI while loading -->
-              <div class="message-ui skeleton">
-                <div class="skeleton-header">
-                  <div class="skeleton-line skeleton-title"></div>
-                  <div class="skeleton-line skeleton-subtitle"></div>
+              {#if message.isStreaming && segs.length === 0}
+                <!-- Skeleton while the response is still streaming -->
+                <div class="message-ui skeleton">
+                  <div class="skeleton-header">
+                    <div class="skeleton-line skeleton-title"></div>
+                    <div class="skeleton-line skeleton-subtitle"></div>
+                  </div>
+                  <div class="skeleton-content">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line skeleton-short"></div>
+                  </div>
+                  <div class="skeleton-actions">
+                    <div class="skeleton-button"></div>
+                    <div class="skeleton-button"></div>
+                  </div>
                 </div>
-                <div class="skeleton-content">
-                  <div class="skeleton-line"></div>
-                  <div class="skeleton-line"></div>
-                  <div class="skeleton-line skeleton-short"></div>
-                </div>
-                <div class="skeleton-actions">
-                  <div class="skeleton-button"></div>
-                  <div class="skeleton-button"></div>
-                </div>
-              </div>
-            {:else if message.uiTree}
-              <div class="message-ui">
-                <UIRenderer
-                  node={message.uiTree}
-                  components={designSystem}
-                  metadata={activeMetadata}
-                />
-              </div>
+              {/if}
             {/if}
           </div>
         </div>
@@ -388,6 +376,14 @@
   .message-content-wrapper {
     flex: 1;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .message-user .message-content-wrapper {
+    align-items: flex-end;
   }
 
   .message-content {
@@ -428,7 +424,8 @@
   }
 
   .message-ui {
-    margin-top: 12px;
+    margin-top: 0;
+    width: 100%;
   }
 
   .skeleton {

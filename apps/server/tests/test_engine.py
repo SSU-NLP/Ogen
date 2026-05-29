@@ -2,9 +2,15 @@
 # OGEN_MODEL env var
 # ---------------------------------------------------------------------------
 
-def test_model_default(engine):
-    """OGEN_MODEL unset → engine.model is 'gpt-5'."""
-    assert engine.model == "gpt-5"
+def test_model_default(tmp_path, monkeypatch):
+    """OGEN_MODEL unset → engine.model is 'gpt-5'.
+    Hermetic: explicitly clear OGEN_MODEL (a developer's .env may set it) and use
+    a fresh engine rather than the session fixture."""
+    monkeypatch.delenv("OGEN_MODEL", raising=False)
+    from ogen_stream.engine import OgenEngine
+
+    eng = OgenEngine(openai_api_key="test-key", persistence_dir=str(tmp_path))
+    assert eng.model == "gpt-5"
 
 
 def test_model_from_env(tmp_path, monkeypatch):
