@@ -87,7 +87,31 @@ def test_build_schema_map_empty(engine):
 # KG index
 # ---------------------------------------------------------------------------
 
-def test_index_built_from_ontology(engine):
-    """Real TTL was loaded; index must be non-empty."""
-    assert len(engine.nodes) > 0
-    assert len(engine.node_embeddings) == len(engine.nodes)
+SAMPLE_TTL = """
+@prefix ex: <http://ogen.ai/ontology/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<http://myapp.com/ui/Button> a ex:Atom ; rdfs:label "Button" ; ex:keywords "click, cta" .
+<http://myapp.com/ui/Card> a ex:Molecule ; rdfs:label "Card" ;
+    ex:hasPart <http://myapp.com/ui/Button> .
+"""
+
+
+def test_index_includes_components_excludes_properties(tmp_path):
+    """Index must contain UI components but not the ontology's property defs.
+
+    The core ontology gives rdfs:label to ~34 property definitions (onClick,
+    hasPart, variant, ...). _build_index filters to the ex:UIElement subtree so
+    those schema nodes stay out of the anchor candidate set.
+
+    Uses a fresh engine (not the session fixture, which is READ-ONLY)."""
+    from ogen_stream.engine import OgenEngine
+
+    eng = OgenEngine(openai_api_key="test-key", persistence_dir=str(tmp_path))
+    eng.load_user_data_from_string(SAMPLE_TTL)
+
+    labels = {n["label"] for n in eng.nodes}
+    assert {"Button", "Card"} <= labels          # real components indexed
+    assert "onClick" not in labels               # property defs excluded
+    assert "hasPart" not in labels
+    assert "variant" not in labels
+    assert len(eng.node_embeddings) == len(eng.nodes)

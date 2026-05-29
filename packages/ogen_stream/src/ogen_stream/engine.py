@@ -85,14 +85,21 @@ class OgenEngine:
             self._store_lock = None
 
     def _build_index(self):
-        """Embed all nodes in the graph (core ontology + user data, default graph)"""
+        """Embed UI component nodes for anchor search.
+
+        Only nodes typed as ex:UIElement (or a subclass: Atom/Molecule/Organism/
+        Template/Action/Container) are indexed. This deliberately excludes the
+        ontology's own property/class definitions, which also carry rdfs:label
+        but are schema vocabulary, not selectable components.
+        """
 
         query = """
     PREFIX ex: <http://ogen.ai/ontology/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-    SELECT ?s ?label ?comment ?keywords WHERE {
+
+    SELECT DISTINCT ?s ?label ?comment ?keywords WHERE {
       ?s rdfs:label ?label .
+      ?s a/rdfs:subClassOf* ex:UIElement .
       OPTIONAL { ?s rdfs:comment ?comment }
       OPTIONAL { ?s ex:keywords ?keywords }
     }
