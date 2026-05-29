@@ -16,9 +16,8 @@
     "resolveJsonModule": true
   },
   "include": [
-    "index.ts",
-    "ttl-generator.ts",
-    "svelte.d.ts"
+    "src/**/*.ts",
+    "src/**/*.svelte"
   ],
   "exclude": [
     "node_modules",

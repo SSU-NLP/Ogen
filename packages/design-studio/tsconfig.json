@@ -14,10 +14,11 @@
     "lib": ["ESNext", "DOM"]
   },
   "include": [
-    "**/*.ts",
-    "**/*.svelte"
+    "src/**/*.ts",
+    "src/**/*.svelte"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist"
   ]
 }

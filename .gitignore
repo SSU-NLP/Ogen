@@ -5,6 +5,7 @@
 **/*.egg-info
 **/dist
 **/build
+**/.svelte-kit
 
 node_modules
 
