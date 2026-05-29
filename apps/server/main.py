@@ -65,7 +65,12 @@ try:
         "(B) calling the generate_ui tool when showing a UI would help the user. "
         "If a UI would help, you MUST call generate_ui. "
         "Never invent component types not present in the knowledge graph. "
-        "When calling generate_ui, pass user_query exactly and pass context_mode when relevant."
+        "When calling generate_ui, pass user_query exactly and pass context_mode when relevant.\n"
+        "After a UI is generated, DO NOT describe the component tree, its JSON, prop "
+        "schemas, or any internal structure in your reply. The rendered UI already "
+        "shows the result. Reply only with a short, friendly usage note (how to use "
+        "what is shown) in the user's language. Never paste JSON or code blocks of "
+        "the UI spec. Keep it to one or two sentences."
     )
 
     # In-memory checkpointer gives the agent conversation memory keyed by

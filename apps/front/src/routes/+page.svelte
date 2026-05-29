@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { browser } from "$app/environment";
+  import { marked } from "marked";
+  import DOMPurify from "dompurify";
   import {
     OgentRuntime,
     UIRenderer,
@@ -12,10 +15,26 @@
     designSystemMetadata as defaultDesignSystemMetadata,
   } from "$lib/ds";
 
+  // Render assistant text as sanitized Markdown. Guarded for SSR (DOMPurify
+  // needs a DOM); falls back to escaped plain text on the server.
+  const escapeHtml = (s: string): string =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const renderMarkdown = (text: string): string => {
+    if (!browser) return escapeHtml(text);
+    const html = marked.parse(text, { async: false }) as string;
+    return DOMPurify.sanitize(html);
+  };
+
+  // Persistent greeting shown as the first assistant turn.
+  const WELCOME_TEXT = "Hi! What can I help you with?";
+
   let query: string = "";
   let runtime: OgentRuntime | null = null;
   let messages: ChatMessage[] = [];
-  let welcomeShown = false;
   let chatContainer: HTMLElement | null = null;
   let connectionStatus: "disconnected" | "connecting" | "connected" | "error" =
     "disconnected";
@@ -54,20 +73,9 @@
     // 상태 구독 (runtime is guaranteed to be non-null here)
     const unsubscribe = runtime.subscribe((state) => {
       connectionStatus = state.connectionStatus;
-
-      if (state.messages.length > 0) {
-        messages = state.messages;
-      } else if (state.connectionStatus === "connected" && !welcomeShown) {
-        welcomeShown = true;
-        messages = [
-          {
-            id: "welcome",
-            role: "assistant",
-            content: "Hi! What can I help you with?",
-            timestamp: new Date(),
-          },
-        ];
-      }
+      // Welcome is a persistent, separately-rendered block (see template), so
+      // here we simply mirror the runtime's conversation messages.
+      messages = state.messages;
     });
 
     // Check backend connection status first
@@ -193,6 +201,14 @@
 
   <main class="chat-container" bind:this={chatContainer}>
     <div class="messages">
+      <!-- Persistent greeting (always shown as the first assistant turn) -->
+      <div class="message message-assistant">
+        <div class="message-avatar">A</div>
+        <div class="message-content-wrapper">
+          <div class="message-content markdown">{@html renderMarkdown(WELCOME_TEXT)}</div>
+        </div>
+      </div>
+
       {#each messages as message (message.id)}
         <div class="message message-{message.role}">
           <!-- One avatar per message/turn -->
@@ -208,7 +224,7 @@
               {#each segs as seg, i (i)}
                 {#if seg.type === "text"}
                   {#if seg.text.trim()}
-                    <div class="message-content">{seg.text}{#if message.isStreaming && i === segs.length - 1}<span class="cursor">▋</span>{/if}</div>
+                    <div class="message-content markdown">{@html renderMarkdown(seg.text)}{#if message.isStreaming && i === segs.length - 1}<span class="cursor">▋</span>{/if}</div>
                   {/if}
                 {:else if seg.type === "ui"}
                   <div class="message-ui">
@@ -222,22 +238,8 @@
               {/each}
 
               {#if message.isStreaming && segs.length === 0}
-                <!-- Skeleton while the response is still streaming -->
-                <div class="message-ui skeleton">
-                  <div class="skeleton-header">
-                    <div class="skeleton-line skeleton-title"></div>
-                    <div class="skeleton-line skeleton-subtitle"></div>
-                  </div>
-                  <div class="skeleton-content">
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line skeleton-short"></div>
-                  </div>
-                  <div class="skeleton-actions">
-                    <div class="skeleton-button"></div>
-                    <div class="skeleton-button"></div>
-                  </div>
-                </div>
+                <!-- Waiting feedback: shimmering "Responding…" -->
+                <div class="responding" aria-live="polite">Responding…</div>
               {/if}
             {/if}
           </div>
@@ -428,80 +430,78 @@
     width: 100%;
   }
 
-  .skeleton {
-    position: relative;
-    overflow: hidden;
-    padding: 16px;
-    background: #f8f9fa;
-    border-radius: 8px;
-  }
-
-  .skeleton::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
+  /* Waiting feedback: gray "Responding…" with a wave of color sweeping across */
+  .responding {
+    font-size: 14px;
+    font-weight: 500;
     background: linear-gradient(
       90deg,
-      transparent,
-      rgba(255, 255, 255, 0.8),
-      transparent
+      #9aa0a6 0%,
+      #9aa0a6 35%,
+      #10a37f 50%,
+      #9aa0a6 65%,
+      #9aa0a6 100%
     );
-    animation: skeleton-loading 1.5s infinite;
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: responding-wave 1.4s linear infinite;
   }
 
-  @keyframes skeleton-loading {
+  @keyframes responding-wave {
     0% {
-      left: -100%;
+      background-position: 100% 0;
     }
     100% {
-      left: 100%;
+      background-position: -100% 0;
     }
   }
 
-  .skeleton-header {
-    margin-bottom: 16px;
+  /* Markdown-rendered assistant text */
+  .markdown :global(p) {
+    margin: 0 0 8px;
   }
-
-  .skeleton-content {
-    margin-bottom: 16px;
+  .markdown :global(p:last-child) {
+    margin-bottom: 0;
   }
-
-  .skeleton-actions {
-    display: flex;
-    gap: 8px;
+  .markdown :global(ul),
+  .markdown :global(ol) {
+    margin: 4px 0 8px;
+    padding-left: 20px;
   }
-
-  .skeleton-line {
-    height: 12px;
-    background: #e9ecef;
+  .markdown :global(li) {
+    margin: 2px 0;
+  }
+  .markdown :global(code) {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 5px;
     border-radius: 4px;
-    margin-bottom: 8px;
+    font-size: 0.9em;
   }
-
-  .skeleton-title {
-    height: 20px;
-    width: 60%;
-    background: #dee2e6;
+  .markdown :global(pre) {
+    background: #f0f0f2;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
   }
-
-  .skeleton-subtitle {
-    height: 14px;
-    width: 40%;
-    background: #e9ecef;
+  .markdown :global(pre code) {
+    background: none;
+    padding: 0;
   }
-
-  .skeleton-short {
-    width: 30%;
+  .markdown :global(a) {
+    color: #10a37f;
+    text-decoration: underline;
   }
-
-  .skeleton-button {
-    height: 32px;
-    width: 80px;
-    background: #e0e0e0;
-    border-radius: 16px;
+  .markdown :global(h1),
+  .markdown :global(h2),
+  .markdown :global(h3) {
+    margin: 8px 0 4px;
+    font-size: 1.05em;
+  }
+  .markdown :global(strong) {
+    font-weight: 600;
   }
 
   .input-area {
