@@ -794,8 +794,14 @@ class OgenEngine:
         with open(ontology_path, "rb") as f:
             new_store.load(f, "text/turtle", base_iri="http://ogen.ai/ontology/")
 
+        # Surface malformed user TTL as a ValueError so the API returns a clear
+        # 400 (mirrors load_user_data_from_string). The live store is untouched
+        # because we only swap below, after a successful parse.
         ttl_bytes = ttl_string.encode("utf-8")
-        new_store.load(ttl_bytes, "text/turtle", base_iri=base_iri)
+        try:
+            new_store.load(ttl_bytes, "text/turtle", base_iri=base_iri)
+        except Exception as e:
+            raise ValueError(f"Failed to parse TTL: {str(e)}")
 
         # Swap in new store and rebuild index
         old_store = self.store

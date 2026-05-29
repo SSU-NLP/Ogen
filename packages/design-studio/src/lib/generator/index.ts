@@ -7,6 +7,25 @@
 import type { ComponentMetadata, TTLGenerationOptions } from '../types';
 import { createDefaultMetadata } from '../types/utils';
 
+/** Atomic-Design / ontology classes that are valid rdf:type values. */
+const VALID_CATEGORIES = new Set([
+  'Atom',
+  'Molecule',
+  'Organism',
+  'Template',
+  'Container',
+  'Action',
+]);
+
+/**
+ * A Turtle prefixed-name local part must be a safe token. We allow the common
+ * component-id subset; anything else (spaces, quotes, punctuation) would
+ * produce invalid Turtle and break the whole graph parse, so it is rejected.
+ */
+function isValidLocalName(name: unknown): name is string {
+  return typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(name);
+}
+
 /**
  * Generate TTL from metadata map
  * 
@@ -20,7 +39,8 @@ import { createDefaultMetadata } from '../types/utils';
  */
 export function generateTTL(
   metadata: Record<string, ComponentMetadata>,
-  options: TTLGenerationOptions = {}
+  options: TTLGenerationOptions = {},
+  warnings: string[] = []
 ): string {
   const {
     baseIRI = 'http://myapp.com/ui/',
@@ -28,10 +48,10 @@ export function generateTTL(
     includeComments = true,
     prettyPrint = true
   } = options;
-  
+
   const lines: string[] = [];
   const nl = prettyPrint ? '\n' : ' ';
-  
+
   // Prefixes
   lines.push(`@prefix user: <${baseIRI}> .`);
   lines.push(`@prefix ogen: <${ontologyPrefix}> .`);
@@ -39,18 +59,18 @@ export function generateTTL(
   lines.push(`@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .`);
   lines.push(`@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`);
   lines.push('');
-  
+
   // Generate TTL for each component
   for (const [name, meta] of Object.entries(metadata)) {
+    const componentTTL = generateComponentTTL(name, meta, baseIRI, ontologyPrefix, warnings);
+    if (!componentTTL) continue; // skipped (invalid name) — already warned
     if (includeComments) {
-      lines.push(`# ${meta.label}`);
+      lines.push(`# ${meta.label ?? name}`);
     }
-    
-    const componentTTL = generateComponentTTL(name, meta, baseIRI, ontologyPrefix);
     lines.push(componentTTL);
     lines.push('');
   }
-  
+
   return lines.join(nl);
 }
 
@@ -64,7 +84,8 @@ export function generateTTL(
 export function generateTTLForRegistry(
   registryKeys: string[],
   metadata: Record<string, ComponentMetadata>,
-  options: TTLGenerationOptions = {}
+  options: TTLGenerationOptions = {},
+  warnings: string[] = []
 ): string {
   const {
     baseIRI = 'http://myapp.com/ui/',
@@ -89,10 +110,12 @@ export function generateTTLForRegistry(
     if (!meta.propSchema) {
       meta.propSchema = {};
     }
+    const componentTTL = generateComponentTTL(name, meta, baseIRI, ontologyPrefix, warnings);
+    if (!componentTTL) continue; // skipped (invalid name) — already warned
     if (includeComments) {
       lines.push(`# ${meta.label ?? name}`);
     }
-    lines.push(generateComponentTTL(name, meta, baseIRI, ontologyPrefix));
+    lines.push(componentTTL);
     lines.push('');
   }
 
@@ -106,102 +129,100 @@ export function generateComponentTTL(
   name: string,
   metadata: ComponentMetadata,
   baseIRI: string = 'http://myapp.com/ui/',
-  ontologyPrefix: string = 'http://ogen.ai/ontology/'
+  ontologyPrefix: string = 'http://ogen.ai/ontology/',
+  warnings: string[] = []
 ): string {
+  // A node with an invalid local name cannot be expressed as a valid IRI;
+  // emitting it would break the entire graph parse, so skip it.
+  if (!isValidLocalName(name)) {
+    warnings.push(`Skipped component "${name}": invalid name (must match [A-Za-z_][A-Za-z0-9_-]*).`);
+    return '';
+  }
+
   const lines: string[] = [];
-  
-  // Component declaration
-  lines.push(`user:${name} a ogen:${metadata.category} ;`);
-  
-  // Basic info
-  lines.push(`    rdfs:label "${escapeString(metadata.label)}" ;`);
-  lines.push(`    rdfs:comment "${escapeString(metadata.comment)}" ;`);
-  
+
+  // Component declaration. Guard the category so we never emit `a ogen: ;`.
+  let category = metadata.category as string;
+  if (!VALID_CATEGORIES.has(category)) {
+    warnings.push(`Component "${name}": invalid/missing category "${category ?? ''}", defaulting to Atom.`);
+    category = 'Atom';
+  }
+  lines.push(`user:${name} a ogen:${category} ;`);
+
+  // Basic info (always escaped)
+  lines.push(`    rdfs:label "${escapeString(metadata.label ?? name)}" ;`);
+  lines.push(`    rdfs:comment "${escapeString(metadata.comment ?? '')}" ;`);
+
   // Keywords
   if (metadata.keywords && metadata.keywords.length > 0) {
     const keywords = metadata.keywords.map(k => escapeString(k)).join(', ');
     lines.push(`    ogen:keywords "${keywords}" ;`);
   }
-  
-  // Ontology relations
-  if (metadata.hasPart && metadata.hasPart.length > 0) {
-    for (const part of metadata.hasPart) {
-      lines.push(`    ogen:hasPart user:${part} ;`);
+
+  // Ontology relations — skip invalid targets instead of breaking the graph.
+  const emitRelation = (predicate: string, targets: string[] | undefined) => {
+    if (!targets || targets.length === 0) return;
+    for (const target of targets) {
+      if (!isValidLocalName(target)) {
+        warnings.push(`Component "${name}": skipped ${predicate} target "${target}" (invalid name).`);
+        continue;
+      }
+      lines.push(`    ogen:${predicate} user:${target} ;`);
     }
-  }
-  
-  if (metadata.requires && metadata.requires.length > 0) {
-    for (const req of metadata.requires) {
-      lines.push(`    ogen:requires user:${req} ;`);
-    }
-  }
-  
-  if (metadata.conflictsWith && metadata.conflictsWith.length > 0) {
-    for (const conflict of metadata.conflictsWith) {
-      lines.push(`    ogen:conflictsWith user:${conflict} ;`);
-    }
-  }
-  
-  if (metadata.recommends && metadata.recommends.length > 0) {
-    for (const rec of metadata.recommends) {
-      lines.push(`    ogen:recommends user:${rec} ;`);
-    }
-  }
-  
-  if (metadata.dependsOn && metadata.dependsOn.length > 0) {
-    for (const dep of metadata.dependsOn) {
-      lines.push(`    ogen:dependsOn user:${dep} ;`);
-    }
-  }
-  
-  // Property schema as JSON
+  };
+  emitRelation('hasPart', metadata.hasPart);
+  emitRelation('requires', metadata.requires);
+  emitRelation('conflictsWith', metadata.conflictsWith);
+  emitRelation('recommends', metadata.recommends);
+  emitRelation('dependsOn', metadata.dependsOn);
+
+  // Property schema as JSON — escape the JSON and embed as a normal string
+  // literal. (A """long string""" still processes \n / \" / \uXXXX escapes,
+  // which would corrupt the JSON on the backend's json.loads.)
   if (metadata.propSchema && Object.keys(metadata.propSchema).length > 0) {
     const propsJson = JSON.stringify(metadata.propSchema);
-    lines.push(`    ogen:propSchema """${propsJson}"""^^xsd:string ;`);
+    lines.push(`    ogen:propSchema "${escapeString(propsJson)}"^^xsd:string ;`);
   }
-  
-  // Layout
+
+  // Layout (escaped)
   if (metadata.layoutType) {
-    lines.push(`    ogen:layoutType "${metadata.layoutType}" ;`);
+    lines.push(`    ogen:layoutType "${escapeString(metadata.layoutType)}" ;`);
   }
-  
   if (metadata.flexDirection) {
-    lines.push(`    ogen:flexDirection "${metadata.flexDirection}" ;`);
+    lines.push(`    ogen:flexDirection "${escapeString(metadata.flexDirection)}" ;`);
   }
-  
   if (metadata.spacing) {
-    lines.push(`    ogen:spacing "${metadata.spacing}" ;`);
+    lines.push(`    ogen:spacing "${escapeString(metadata.spacing)}" ;`);
   }
-  
-  // Accessibility
+
+  // Accessibility (escaped)
   if (metadata.ariaLabel) {
     lines.push(`    ogen:ariaLabel "${escapeString(metadata.ariaLabel)}" ;`);
   }
-  
   if (metadata.role) {
-    lines.push(`    ogen:role "${metadata.role}" ;`);
+    lines.push(`    ogen:role "${escapeString(metadata.role)}" ;`);
   }
-  
-  // State
+
+  // State (escaped)
   if (metadata.defaultState) {
-    lines.push(`    ogen:defaultState "${metadata.defaultState}" ;`);
+    lines.push(`    ogen:defaultState "${escapeString(metadata.defaultState)}" ;`);
   }
-  
-  // Style
+
+  // Style (escaped)
   if (metadata.variant) {
-    lines.push(`    ogen:variant "${metadata.variant}" ;`);
+    lines.push(`    ogen:variant "${escapeString(metadata.variant)}" ;`);
   }
-  
-  // Validation rules as JSON
+
+  // Validation rules as JSON (escaped, normal literal)
   if (metadata.validationRules && Object.keys(metadata.validationRules).length > 0) {
     const rulesJson = JSON.stringify(metadata.validationRules);
-    lines.push(`    ogen:validationRules """${rulesJson}"""^^xsd:string ;`);
+    lines.push(`    ogen:validationRules "${escapeString(rulesJson)}"^^xsd:string ;`);
   }
-  
+
   // Close the statement (replace last ; with .)
   const lastLine = lines[lines.length - 1];
   lines[lines.length - 1] = lastLine.replace(/\s*;$/, ' .');
-  
+
   return lines.join('\n');
 }
 
@@ -219,7 +240,7 @@ export function serializeToTTL(
  * Escape special characters in string for TTL
  */
 function escapeString(str: string): string {
-  return str
+  return String(str ?? '')
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')

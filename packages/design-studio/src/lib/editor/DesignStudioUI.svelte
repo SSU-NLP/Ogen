@@ -19,7 +19,7 @@
   
   const dispatch = createEventDispatcher<{
     save: { metadata: Record<string, ComponentMetadata>; ttl: string };
-    sync: { success: boolean; message: string };
+    sync: { success: boolean; message: string; warnings: string[] };
     select: { componentName: string };
     fileSaved: { success: boolean; message: string };
     fileLoaded: { success: boolean; message: string };
@@ -79,6 +79,24 @@
   
   // Reactive: Update TTL preview (registry-only; excludes metadata-only/red nodes)
   $: ttlPreview = generateTTLForRegistry(componentNames, editedMetadata);
+
+  // Surface preview aliasing: many logical names (LoginCard, EmailInput, ...)
+  // resolve to a shared/generic component, so the preview can be misleading.
+  $: aliasNote = (() => {
+    if (!selectedComponent) return null;
+    const comp = registry[selectedComponent];
+    if (!comp) return null;
+    const canonical = Object.keys(registry).find(
+      (k) => k !== selectedComponent && k !== 'default' && registry[k] === comp
+    );
+    if (registry.default && comp === registry.default && selectedComponent !== 'default') {
+      return 'Rendered with the generic fallback component — no dedicated implementation is registered for this name.';
+    }
+    if (canonical) {
+      return `Rendered using the "${canonical}" component (this name is an alias).`;
+    }
+    return null;
+  })();
   
   // Initialize from props once
   $: if (!hasInitialized) {
@@ -286,10 +304,20 @@
   async function handleSync() {
     connectionStatus = 'connecting';
     statusMessage = 'Connecting to backend...';
-    
+
+    // Build TTL, collecting any nodes/relations the generator had to skip so
+    // we can warn the user instead of silently shipping a partial graph.
+    const warnings: string[] = [];
+    const ttl = generateTTLForRegistry(componentNames, editedMetadata, {}, warnings);
+    const warnPrefix = warnings.length
+      ? `${warnings.length} item(s) skipped (e.g. ${warnings[0]}). `
+      : '';
+
+    // Time-box the request so a hung/unreachable backend doesn't freeze the UI.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     try {
-      const ttl = generateTTLForRegistry(componentNames, editedMetadata);
-      
       const response = await fetch(`${backendUrl}/api/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -297,21 +325,36 @@
           ttl_content: ttl,
           base_iri: 'http://myapp.com/ui/',
           force: true
-        })
+        }),
+        signal: controller.signal
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        // Prefer the backend's structured `detail`; fall back to raw text.
+        let detail = '';
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? JSON.stringify(body);
+        } catch {
+          detail = await response.text().catch(() => '');
+        }
+        throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
       }
-      
+
       const data = await response.json();
       connectionStatus = 'connected';
-      statusMessage = `Connected! ${data.node_count} nodes loaded.`;
-      dispatch('sync', { success: true, message: statusMessage });
+      statusMessage = `${warnPrefix}Connected! ${data.node_count} nodes loaded.`;
+      dispatch('sync', { success: true, message: statusMessage, warnings });
     } catch (error) {
+      const isAbort = error instanceof DOMException && error.name === 'AbortError';
+      const msg = isAbort
+        ? `Backend did not respond within 30s at ${backendUrl}. Is it running?`
+        : error instanceof Error ? error.message : String(error);
       connectionStatus = 'error';
-      statusMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
-      dispatch('sync', { success: false, message: statusMessage });
+      statusMessage = `${warnPrefix}Sync failed — ${msg}`;
+      dispatch('sync', { success: false, message: statusMessage, warnings });
+    } finally {
+      clearTimeout(timeout);
     }
   }
   
@@ -611,6 +654,7 @@
             variants={currentVariants}
             props={previewProps}
             externalSlotText={previewSlotText}
+            {aliasNote}
             showHeader={false}
             showControls={false}
             showProps={false}

@@ -10,6 +10,8 @@
   export let showHeader: boolean = true;
   export let showControls: boolean = true;
   export let showProps: boolean = true;
+  /** Optional notice when the rendered component is an alias/generic fallback. */
+  export let aliasNote: string | null = null;
 
   let selectedVariant = 0;
   let propsDraft: Record<string, unknown> = {};
@@ -78,11 +80,24 @@
 
   <div class="preview-body" style:grid-template-columns={previewColumns}>
     <div class="frame" style:width={frameWidth()}>
+      {#if aliasNote}
+        <div class="alias-note" role="note">{aliasNote}</div>
+      {/if}
       {#if component}
         <div class="canvas">
-          <svelte:component this={component} {...activeProps}>
-            {activeSlotText}
-          </svelte:component>
+          <svelte:boundary>
+            <svelte:component this={component} {...activeProps}>
+              {activeSlotText}
+            </svelte:component>
+
+            {#snippet failed(error, reset)}
+              <div class="preview-error" role="alert">
+                <strong>⚠ Preview failed to render</strong>
+                <pre>{error instanceof Error ? error.message : String(error)}</pre>
+                <button type="button" on:click={reset}>Retry</button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
         </div>
       {:else}
         <div class="empty">No component registered for preview.</div>
@@ -264,5 +279,38 @@
     padding: 14px;
     font-size: 13px;
     color: var(--ds-muted);
+  }
+
+  .alias-note {
+    margin: 8px 8px 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--ds-muted);
+    background: var(--ds-surface-2);
+    border: 1px dashed var(--ds-border);
+    border-radius: 8px;
+  }
+
+  .preview-error {
+    padding: 14px;
+    font-size: 13px;
+    color: var(--ds-danger, #b91c1c);
+  }
+
+  .preview-error pre {
+    margin: 6px 0 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+  }
+
+  .preview-error button {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--ds-border);
+    background: var(--ds-surface-2);
+    color: var(--ds-text);
+    cursor: pointer;
   }
 </style>

@@ -122,6 +122,7 @@ export let selected: string | null = null;
     cy.style()
       .selector('node')
       .style('color', nodeText)
+      .style('text-outline-color', theme === 'dark' ? '#0f111a' : '#ffffff')
       .update();
     cy.style()
       .selector('edge')
@@ -151,13 +152,17 @@ export let selected: string | null = null;
           style: {
             label: 'data(label)',
             color: nodeText,
-            'font-size': '10px',
+            'font-size': '11px',
             'text-wrap': 'wrap',
-            'text-max-width': '90px',
-            'text-valign': 'center',
+            'text-max-width': '120px',
+            'text-valign': 'bottom',
             'text-halign': 'center',
-            width: '34px',
-            height: '34px',
+            'text-margin-y': 6,
+            // Outline keeps labels legible over edges/background.
+            'text-outline-width': 2,
+            'text-outline-color': theme === 'dark' ? '#0f111a' : '#ffffff',
+            width: '40px',
+            height: '40px',
             'border-width': 2,
             'border-color': 'rgba(255,255,255,0.10)'
           }
@@ -248,6 +253,11 @@ export let selected: string | null = null;
     lastGraphSignature = computeGraphSignature(metadata);
     applySelection(selected);
     applyThemeStyles();
+
+    // Auto fit-to-view once the initial layout settles, so the graph is
+    // visible without the user having to click "Fit". Subsequent structure
+    // changes preserve the user's zoom/pan (see the reactive block below).
+    cy.one('layoutstop', () => cy?.fit(undefined, 30));
   });
 
   // Only rebuild elements/layout when the underlying graph changes.
