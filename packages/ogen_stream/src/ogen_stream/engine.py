@@ -1,5 +1,5 @@
 import pyoxigraph
-from pyoxigraph import Store, NamedNode, RdfFormat
+from pyoxigraph import Store, RdfFormat
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from jsonschema import Draft7Validator
@@ -55,10 +55,6 @@ class OgenEngine:
                 self.store = Store()
                 self.user_data_loaded = False
 
-        self.GRAPH_CORE = NamedNode("http://ogen.ai/graph/core")
-        self.GRAPH_USER = NamedNode("http://ogen.ai/graph/user")
-        self.GRAPH_CONTEXT = NamedNode("http://ogen.ai/graph/context")
-
         # Ontology file path (inside package)
         current_dir = Path(__file__).parent
         ontology_path = current_dir / "ogen-core.ttl"
@@ -88,7 +84,7 @@ class OgenEngine:
             self._store_lock = None
 
     def _build_index(self):
-        """Embed all nodes in the graph (unified search across GRAPH_CORE + GRAPH_USER)"""
+        """Embed all nodes in the graph (core ontology + user data, default graph)"""
 
         query = """
     PREFIX ex: <http://ogen.ai/ontology/>
@@ -671,23 +667,7 @@ class OgenEngine:
         }
 
     def is_user_data_loaded(self) -> bool:
-        """Check if user data is loaded"""
-        if self.user_data_loaded:
-            return True
-
-        # Check if GRAPH_USER has data via SPARQL query
-        query = """
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-    SELECT (COUNT(?s) as ?count) WHERE {
-      ?s rdfs:label ?label .
-    }
-    LIMIT 1
-    """
-
-        results = self.store.query(query)
-        # Compare with ontology node count to check if user data exists
-        # Managed simply via flag
+        """Check if user data is loaded (tracked via flag)."""
         return self.user_data_loaded
 
     def load_user_data_from_string(

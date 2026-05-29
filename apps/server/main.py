@@ -13,11 +13,11 @@ from langchain.agents import create_agent
 from ogen_stream.engine import OgenEngine
 from ogen_stream.ui_generator import UIGenerationPipeline
 from ogen_stream.tools import create_langchain_tool
-from ogen_stream.stream import StreamEvent, StreamEventType, format_sse_event
+from ogen_stream.stream import StreamEventType
 
 # load .env
 load_dotenv()
-    
+
 app = FastAPI(title="Ogen AI Engine API")
 app.add_middleware(
     CORSMiddleware,
