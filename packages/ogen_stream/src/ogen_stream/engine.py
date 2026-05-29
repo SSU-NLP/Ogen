@@ -7,6 +7,7 @@ import numpy as np
 import openai
 import json
 import os
+from collections import deque
 from pathlib import Path
 
 
@@ -135,14 +136,14 @@ class OgenEngine:
         prunes irrelevant child nodes via LLM.
         """
         visited = set()
-        queue = [(anchor_uri, 0)]  # (uri, depth)
+        queue = deque([(anchor_uri, 0)])  # (uri, depth)
         subgraph = {}
 
         # Pruning Threshold: LLM intervenes only when children exceed this count (saves tokens)
         pruning_threshold = 3
 
         while queue:
-            current_uri, depth = queue.pop(0)  # BFS
+            current_uri, depth = queue.popleft()  # BFS
 
             if current_uri in visited:
                 continue
