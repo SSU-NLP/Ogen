@@ -380,3 +380,16 @@ Default model: `gpt-5` for all pipeline stages. Override via `OGEN_MODEL` env va
 Portable agent skills live in `.agents/skills/<skill-name>/SKILL.md`. Codex reads this location directly. Claude Code project skills should point to shared skills from `.claude/skills/<skill-name>` with a symlink when the workflow is meant to be identical across agents.
 
 Do not edit a symlinked `.claude/skills/<skill-name>` as if it were the source; edit the matching `.agents/skills/<skill-name>` directory instead. Claude-only skills may remain as real directories under `.claude/skills/`.
+
+## Outstanding Work / Backlog
+
+See `handoff.md` for the full, living handoff (recently completed + how to run/verify). Summary of what's left:
+
+- **Design Studio – editing UX**: inline propSchema editor; relation field autocomplete + validation; replace the `prompt()` add-component flow; unsaved-changes guard.
+- **Design Studio – layout/a11y**: responsive layout (fixed 3-col breaks <~1000px); larger click targets; contrast/focus fixes.
+- **Metadata/scanner**: reconcile the 3 sources of truth (`ds.ts` / `design-studio.metadata.json` dev-only / `localStorage`); the browser scanner is unused.
+- **Ontology/engine**: canonicalize `ogen-core.ttl` to Atomic Design (add Page level; split Action/Container out of the level taxonomy; align `ComponentCategory`); make traversal level-aware; batch the N+1 SPARQL in subgraph retrieval.
+- **Chat/backend**: persistent memory (SQLite checkpointer; current `InMemorySaver` is lost on restart); markdown streaming edge cases.
+- **Packaging**: libraries are publish-ready but not published; for independent publish, pin a released `ogen-stream` version in `apps/server/pyproject.toml`.
+- **Testing**: add a frontend test framework (Vitest) for `OgentRuntime` stream/segment logic.
+- **Housekeeping**: add `@types/node` (apps/front metadata route + design-studio scanner); decide on committing untracked infra (`.agents/`, `.claude/`, `CLAUDE.md`, `docs/superpowers/`); remove the stale `CLAUDE.md.pre-agent-unifier.bak`; push `main` to origin.

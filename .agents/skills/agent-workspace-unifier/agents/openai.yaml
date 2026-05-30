@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Workspace Unifier"
+  short_description: "Unify AGENTS.md, Claude adapters, and shared skills"
+  default_prompt: "Unify this repository so Codex and Claude Code share AGENTS.md and portable skills."

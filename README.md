@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">Ogen</h1>
+  <h1 align="center">OGen</h1>
   <p align="center"><b>Ontology-Based Generative UI Engine</b></p>
   <p align="center">
     A conversational system that generates UI through Knowledge Graph-based design system reasoning
