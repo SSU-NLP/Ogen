@@ -12,3 +12,18 @@ node_modules
 experiments
 
 .DS_Store
+
+# Local Claude Code machine state (not shared)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Shared agent skills: only repo-specific infra skills are tracked.
+# Personal/cross-project research skills stay local.
+.agents/skills/*
+!.agents/skills/agent-workspace-unifier/
+.claude/skills/*
+!.claude/skills/agent-workspace-unifier
+!.claude/skills/claude-code-setup/
+
+# Runtime-mutated KG artifact; seed graph is produced at runtime via /api/connect
+apps/server/ogen_data/user_graph.trig
