@@ -56,7 +56,13 @@ Backend tests: `cd apps/server && uv run pytest -q` → **24 passing**.
   `Action`/`Container` out of the level taxonomy (they're roles, not levels);
   align design-studio `ComponentCategory` (currently missing Page, includes Container).
 - Make engine traversal **Atomic-Design-level aware** (currently the classes are
-  defined but unused in BFS/depth logic).
+  defined but unused in BFS/depth logic). **Prior art to port**: an earlier
+  (Feb 2026) line implemented category/hierarchy-aware indexing + candidate
+  re-ranking (KAPING, `Template > Organism > Molecule > Atom` boost) in
+  `engine.py`. It was superseded by the current main but preserved on
+  `origin/archive/2026-02-engine-line` (tip `f8f7836`); see commit `c87ae91`.
+  Note that line also deleted `ogen-core.ttl` and moved the ontology to
+  `apps/server/data/knowledge.ttl` — port the indexing idea, not that layout.
 - Perf: **N+1 SPARQL batching** in subgraph retrieval (`_get_node_properties` /
   `_get_children` query per node).
 
@@ -77,15 +83,22 @@ Backend tests: `cd apps/server && uv run pytest -q` → **24 passing**.
   segment-accumulation / stream handling.
 
 ### Housekeeping
-- Pre-existing `@types/node` errors: `apps/front/.../api/design-studio/metadata/+server.ts`
-  and `packages/design-studio/src/lib/scanner/index.ts` (add `@types/node`).
-- a11y label warnings in `apps/front/src/lib/components/*`.
-- Uncommitted/loose: `.env.example`, `README.md` (Ogen→OGen), `user_graph.trig`
-  (runtime artifact — decide whether to keep tracked), `CLAUDE.md.pre-agent-unifier.bak`
-  (stale migration backup — delete or gitignore).
-- Untracked infra to decide on committing: `.agents/`, `.claude/`, `CLAUDE.md`,
-  `docs/superpowers/`.
-- `main` is well ahead of `origin/main` → push when ready.
+- ~~`@types/node` errors in apps/front metadata route + design-studio scanner~~
+  **Done** — added `@types/node`; `pnpm check` passes clean in both packages.
+- a11y label warnings in `apps/front/src/lib/components/*` (10 warnings; still open).
+- ~~Loose/untracked: `.env.example`, `README.md`, `user_graph.trig`, `.bak`,
+  `.agents/`, `.claude/`, `CLAUDE.md`, `docs/superpowers/`~~ **Done** —
+  committed shared infra (AGENTS/CLAUDE/.agents + agent-workspace-unifier +
+  claude-code-setup), handoff, and config docs; `user_graph.trig` untracked +
+  gitignored as a runtime artifact; personal research skills and
+  `.claude/settings.local.json`/`worktrees` gitignored; `.bak` already gone.
+- ~~Push `main` to `origin`~~ **Done (2026-05-30)** — `origin/main` had a
+  divergent **Feb 2026** line (7 commits built on the same base `506b2c1` but
+  never pulled before the May work). Reconciled by **force-pushing the May line
+  as canonical**; the Feb line is preserved at
+  `origin/archive/2026-02-engine-line` (see Ontology/engine above for what to
+  salvage). If resuming on another machine, `git pull` before new work to avoid
+  re-diverging.
 
 ## How to run / verify
 - Full stack: `./start.sh` (builds the npm packages, then runs backend :8000 +
